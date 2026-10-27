@@ -1,0 +1,21 @@
+{
+  "name": "hunterops",
+  "version": "1.0.0",
+  "description": "HunterOps: Recruiter Command Center. Static SPA + Netlify Functions + Neon Postgres + OpenCode Go (DeepSeek).",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npx netlify-cli@latest dev",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "test": "node --test --experimental-test-module-mocks test/*.test.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2"
+  },
+  "devDependencies": {
+    "pg": "^8.23.1"
+  }
+}

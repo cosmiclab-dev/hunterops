@@ -1,0 +1,73 @@
+# HunterOps: Recruiter Command Center
+# Static SPA in /public, serverless API in /netlify/functions.
+
+[build]
+  publish = "public"
+  functions = "netlify/functions"
+  # No build step: the frontend is plain HTML/CSS/ES modules.
+  command = "echo 'No build step required'"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  node_bundler = "esbuild"
+
+[dev]
+  publish = "public"
+  port = 8888
+
+# ---- API rewrites -------------------------------------------------------
+# Friendly REST paths first, then the generic /api/* -> /.netlify/functions/*.
+
+[[redirects]]
+  from = "/api/jobs"
+  to = "/.netlify/functions/db/jobs"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/jobs/*"
+  to = "/.netlify/functions/db/jobs/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/outreach"
+  to = "/.netlify/functions/db/outreach"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/db/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/ai"
+  to = "/.netlify/functions/ai-brain"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true
+
+# ---- Security headers ---------------------------------------------------
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
