@@ -41,12 +41,25 @@ export function llmConfig(settings: Settings, o: Overrides = {}): LlmConfig {
   return { provider, format: def.format, endpoint, key, model };
 }
 
-function upstreamHint(cfg: LlmConfig, status: number) {
+// The provider's own error text, trimmed, so the person sees why it refused.
+export function upstreamMessage(raw: string): string {
+  let msg = raw;
+  try {
+    const data = JSON.parse(raw);
+    const e = data?.error ?? data;
+    msg = typeof e === 'string' ? e : e?.message || e?.detail || data?.message || '';
+  } catch { /* plain text body */ }
+  return String(msg).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240);
+}
+
+function upstreamHint(cfg: LlmConfig, status: number, raw = '') {
   const name = PROVIDERS[cfg.provider].label;
-  if (status === 401 || status === 403) return `${name} rejected the API key. Check it in Settings.`;
-  if (status === 429) return `${name} rate or usage limit reached. Wait a little and try again.`;
-  if (status === 404 || status === 400) return `${name} refused the request (HTTP ${status}). Check the model "${cfg.model}" in Settings.`;
-  return `${name} returned HTTP ${status}.`;
+  const said = upstreamMessage(raw);
+  const why = said ? ` It said: "${said}"` : '';
+  if (status === 401 || status === 403) return `${name} rejected the request (HTTP ${status}). Check the API key in Settings.${why}`;
+  if (status === 429) return `${name} rate or usage limit reached. Wait a little and try again.${why}`;
+  if (status === 404 || status === 400) return `${name} refused the request (HTTP ${status}) for model "${cfg.model}".${why}`;
+  return `${name} returned HTTP ${status}.${why}`;
 }
 
 function buildRequest(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions): { headers: Record<string, string>; body: unknown } {
@@ -66,7 +79,11 @@ function buildRequest(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions
     };
   }
   return {
-    headers: { 'Content-Type': 'application/json', ...(cfg.key ? { Authorization: `Bearer ${cfg.key}` } : {}) },
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'hunterops/2.0',
+      ...(cfg.key ? { Authorization: `Bearer ${cfg.key}` } : {}),
+    },
     body: {
       model: cfg.model,
       messages,
@@ -105,13 +122,13 @@ export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOp
   }
   const raw = await res.text();
   if (!res.ok) {
-    // Some models reject response_format or temperature; retry once without them.
-    if (res.status === 400 && opts.json && /response_format/i.test(raw)) return chat(cfg, messages, { ...opts, json: false });
-    if (res.status === 400 && opts.temperature !== undefined && /temperature/i.test(raw)) {
-      return chat(cfg, messages, { ...opts, temperature: undefined });
+    // Some models reject response_format or temperature, and not every provider
+    // names the field in its error; retry once with the plainest request.
+    if (res.status === 400 && (opts.json || opts.temperature !== undefined)) {
+      return chat(cfg, messages, { ...opts, json: false, temperature: undefined });
     }
     console.error('[llm] upstream', res.status, raw.slice(0, 500));
-    throw new HttpError(502, upstreamHint(cfg, res.status));
+    throw new HttpError(502, upstreamHint(cfg, res.status, raw));
   }
   let data: any;
   try {
