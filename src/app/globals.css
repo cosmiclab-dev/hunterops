@@ -1,0 +1,49 @@
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/roboto-mono/400.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* shadcn/ui tokens mapped onto the three DESIGN.md colours:
+   #111111 text, #FFFFFF background, #E5E5E5 borders. */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 6.7%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 6.7%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 6.7%;
+    --primary: 0 0% 6.7%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 100%;
+    --secondary-foreground: 0 0% 6.7%;
+    --muted: 0 0% 100%;
+    --muted-foreground: 0 0% 6.7%;
+    --accent: 0 0% 89.8%;
+    --accent-foreground: 0 0% 6.7%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 6.7%;
+    --radius: 4px;
+  }
+  * { @apply border-border; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  /* iOS zooms into inputs under 16px; keep form text at 16px on phones. */
+  input, textarea, select { font-size: 16px; }
+  @media (min-width: 768px) { input, textarea, select { font-size: 14px; } }
+}
+
+@layer components {
+  .meta { @apply font-mono text-xs leading-4; }
+  .label-caps { @apply font-mono text-xs uppercase tracking-wider leading-4; }
+}

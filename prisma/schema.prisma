@@ -1,0 +1,194 @@
+// HunterOps v2 data model (Neon serverless Postgres).
+// DATABASE_URL is the pooled connection string (host contains "-pooler"),
+// DIRECT_URL the direct one, used by `prisma db push` / migrations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum JobStatus {
+  NEW
+  SAVED
+  APPLIED
+  INTERVIEW
+  OFFER
+  REJECTED
+  DISMISSED
+}
+
+enum WorkMode {
+  REMOTE
+  HYBRID
+  ONSITE
+  UNKNOWN
+}
+
+enum EmailStatus {
+  DRAFT
+  APPROVED
+  SENT
+  FAILED
+}
+
+// The single master profile. Resumes, the Grill and emails all read from it.
+model Profile {
+  id              Int      @id @default(1)
+  name            String   @default("")
+  headline        String   @default("")
+  email           String   @default("")
+  phone           String   @default("")
+  location        String   @default("")
+  linkedin        String   @default("")
+  portfolio       String   @default("")
+  summary         String   @default("")
+  yearsExperience Float?   @map("years_experience")
+  skills          String[] @default([])
+  // Where the person will work: the Grill's strict location check reads these.
+  acceptRemote    Boolean  @default(true) @map("accept_remote")
+  acceptHybrid    Boolean  @default(true) @map("accept_hybrid")
+  onsiteCities    String[] @default(["Bengaluru"]) @map("onsite_cities")
+  // experience[], education[], certifications[], achievements[]
+  data            Json     @default("{}")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("profile")
+}
+
+// A company careers board the scanner polls (Greenhouse, Lever, Ashby, Workday, ...).
+model Company {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String
+  atsType       String    @map("ats_type")
+  atsSlug       String    @map("ats_slug")
+  active        Boolean   @default(true)
+  lastScannedAt DateTime? @map("last_scanned_at")
+  lastStatus    String?   @map("last_status")
+  lastError     String?   @map("last_error")
+  lastFound     Int?      @map("last_found")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  jobs          Job[]
+
+  @@unique([atsType, atsSlug])
+  @@map("companies")
+}
+
+// One posting. The feed and the tracker are the same table, split by status.
+model Job {
+  id             String     @id @default(uuid()) @db.Uuid
+  source         String
+  company        String
+  companyId      String?    @map("company_id") @db.Uuid
+  companyRef     Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  title          String
+  location       String?
+  locationClass  String?    @map("location_class")
+  workMode       WorkMode   @default(UNKNOWN) @map("work_mode")
+  url            String     @unique
+  postedAt       DateTime?  @map("posted_at")
+  firstSeenAt    DateTime   @default(now()) @map("first_seen_at")
+  description    String?
+  salary         String?
+  status         JobStatus  @default(NEW)
+  // Module D (The Grill): 0-100 and the per-dimension breakdown.
+  grillScore     Int?       @map("grill_score")
+  grillBreakdown Json?      @map("grill_breakdown")
+  grilledAt      DateTime?  @map("grilled_at")
+  notes          String?
+  appliedAt      DateTime?  @map("applied_at")
+  updatedAt      DateTime   @updatedAt @map("updated_at")
+  resumes        Resume[]
+  emails         Email[]
+  contacts       Contact[]
+
+  @@index([status, firstSeenAt(sort: Desc)])
+  @@index([grillScore(sort: Desc)])
+  @@map("jobs")
+}
+
+// A tailored resume (a copy of the profile shaped for one job).
+model Resume {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  jobId     String?  @map("job_id") @db.Uuid
+  job       Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  density   String   @default("standard")
+  data      Json
+  // Module A (Anti-Slop) score of the resume text at save time.
+  slopScore Int?     @map("slop_score")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("resumes")
+}
+
+model Contact {
+  id        String   @id @default(uuid()) @db.Uuid
+  company   String
+  name      String?
+  title     String?
+  email     String?
+  linkedin  String?
+  jobId     String?  @map("job_id") @db.Uuid
+  job       Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  emails    Email[]
+
+  @@map("contacts")
+}
+
+// Recruiter emails. Nothing is sent until the person approves the draft.
+model Email {
+  id         String      @id @default(uuid()) @db.Uuid
+  jobId      String?     @map("job_id") @db.Uuid
+  job        Job?        @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  contactId  String?     @map("contact_id") @db.Uuid
+  contact    Contact?    @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  kind       String      @default("cold")
+  framework  String      @default("plain")
+  toEmail    String      @map("to_email")
+  subject    String
+  body       String
+  status     EmailStatus @default(DRAFT)
+  slopScore  Int?        @map("slop_score")
+  error      String?
+  messageId  String?     @map("message_id")
+  approvedAt DateTime?   @map("approved_at")
+  sentAt     DateTime?   @map("sent_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@index([createdAt(sort: Desc)])
+  @@map("emails")
+}
+
+model ScanRun {
+  id         String    @id @default(uuid()) @db.Uuid
+  trigger    String
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  sources    Int?
+  fetched    Int?
+  matched    Int?
+  inserted   Int?
+  errors     Json?
+
+  @@index([startedAt(sort: Desc)])
+  @@map("scan_runs")
+}
+
+// Key-value settings. Secret values (API keys, Gmail app password) are
+// AES-256-GCM encrypted with APP_SECRET before they reach the database.
+model Setting {
+  key       String   @id
+  value     String
+  isSecret  Boolean  @default(false) @map("is_secret")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
