@@ -6,13 +6,14 @@ import { saveInternal, type Settings } from '../settings';
 import { clip, csv } from '../utils';
 import { classifyLocation, detectWorkMode, LOCATION_CLASSES, type LocationClass } from '../location';
 import { ATS_FETCHERS, BOARD_FETCHERS, type Posting, type ScanCtx } from './sources';
-import { SEED_COMPANIES } from './seed-companies';
+import { RETIRED_COMPANIES, SEED_COMPANIES } from './seed-companies';
 import { grill } from '../modules/grill';
-import { loadProfile, toGrillProfile } from '../profile';
+import { loadProfile, profileIsEmpty, toGrillProfile } from '../profile';
 
 const CONCURRENCY = 8;
 const PER_SOURCE_RESERVE_MS = 14_000; // don't start a source with less time than this left
-const BOARD_INTERVAL_MS = 2 * 60 * 60 * 1000;
+// Job boards (Adzuna, Remotive, ...) are searched at most every 10 minutes.
+const BOARD_INTERVAL_MS = 10 * 60 * 1000;
 const MAX_AGE_DAYS = 45;
 
 const norm = (s: string) => ` ${String(s || '').toLowerCase().replace(/[^a-z0-9+#]+/g, ' ').trim()} `;
@@ -67,12 +68,12 @@ export function filterPostings(postings: Posting[], prefs: ScanPrefs, now = Date
 export async function insertPostings(rows: Kept[]) {
   const unique = [...new Map(rows.map((r) => [r.url, r])).values()];
   const profile = await loadProfile();
-  const gp = profile ? toGrillProfile(profile) : null;
+  const gp = profile && !profileIsEmpty(profile) ? toGrillProfile(profile) : null;
   let inserted = 0;
   for (let i = 0; i < unique.length; i += 100) {
     const data: Prisma.JobCreateManyInput[] = unique.slice(i, i + 100).map((r) => {
       const workMode = detectWorkMode(r.location, r.description, r.remote);
-      const g = gp ? grill(gp, { title: r.title, location: r.location, description: r.description, workMode }) : null;
+      const g = gp ? grill(gp, { title: r.title, location: r.location, description: r.description, workMode, salary: r.salary }) : null;
       return {
         source: r.source,
         company: clip(r.company || 'Unknown', 200) as string,
@@ -118,10 +119,15 @@ async function pool<T>(tasks: (() => Promise<T>)[], deadline: number) {
   return results;
 }
 
+// Adds starter boards that are missing (new ones ship with app updates) and pauses retired ones.
 export async function seedCompanies() {
   const res = await prisma.company.createMany({
     data: SEED_COMPANIES.map(([name, atsType, atsSlug]) => ({ name, atsType, atsSlug })),
     skipDuplicates: true,
+  });
+  await prisma.company.updateMany({
+    where: { OR: RETIRED_COMPANIES.map(([atsType, atsSlug]) => ({ atsType, atsSlug })) },
+    data: { active: false },
   });
   return res.count;
 }
@@ -141,7 +147,7 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
   const prefs = scanPrefs(settings);
   const run = await prisma.scanRun.create({ data: { trigger } });
 
-  if (!companyIds && (await prisma.company.count()) === 0) await seedCompanies();
+  if (!companyIds) await seedCompanies();
   const companies = companyIds
     ? await prisma.company.findMany({ where: { id: { in: companyIds } } })
     : await prisma.company.findMany({ where: { active: true }, orderBy: { lastScannedAt: { sort: 'asc', nulls: 'first' } }, take: companyLimit });
@@ -207,6 +213,7 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
     fetched,
     matched: rows.length,
     inserted,
+    already_on_board: Math.max(0, new Set(rows.map((r) => r.url)).size - inserted),
     errors: errors.slice(0, 50),
     boards: scanBoards,
     ms: Date.now() - started,

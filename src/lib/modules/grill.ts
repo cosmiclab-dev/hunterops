@@ -1,18 +1,21 @@
 // Module D: The Grill.
 // A deterministic 0-100 fit score for one job against the master profile.
 // No AI call, so every job in the feed can be scored on arrival and the score
-// is the same every time. Weights (fixed):
-//   Skills match   40  overlap between Profile skills and the JD's required skills
-//   Location fit   20  strict: the job's work mode and city against the person's rules
+// is the same every time. Weights (fixed), after the career-ops rubric:
+//   Hard skills    40  required JD skills found in the profile (30), plus
+//                      "nice to have" / "preferred" matches (10)
 //   Experience     20  years in the profile against the JD's years requirement
-//   Keywords       20  bonus for "nice to have" / "preferred" matches
+//   Location fit   20  strict: the job's work mode and city against the person's rules
+//   Salary fit     20  the posted pay range against the person's expected CTC
 // Whole-term matching follows the approach in Resume-Matcher's text_match.py
 // (srbhr/Resume-Matcher, Apache-2.0): "java" must not match "javascript".
 
 import { cityMatches, detectWorkMode, type WorkModeValue } from '../location';
+import { parseSalaryLpa, salaryFromText } from '../salary';
 
-export const GRILL_WEIGHTS = { skills: 40, location: 20, experience: 20, keywords: 20 } as const;
-export const GRILL_VERSION = 1;
+export const GRILL_WEIGHTS = { skills: 40, experience: 20, location: 20, salary: 20 } as const;
+const SKILLS_REQUIRED_SHARE = 0.75; // 30 of the 40 skill points; nice-to-haves carry the rest
+export const GRILL_VERSION = 2;
 
 export type GrillProfile = {
   skills: string[];
@@ -22,6 +25,8 @@ export type GrillProfile = {
   onsiteCities: string[];
   // Free text of the whole profile (summary, bullets); used for nice-to-have evidence.
   text?: string;
+  // Lowest acceptable pay, lakh rupees per annum.
+  expectedSalaryLpa?: number | null;
 };
 
 export type GrillJob = {
@@ -29,6 +34,7 @@ export type GrillJob = {
   location: string | null;
   description: string | null;
   workMode?: WorkModeValue | null;
+  salary?: string | null;
 };
 
 export type GrillBand = 'red' | 'yellow' | 'green';
@@ -37,10 +43,15 @@ export type GrillResult = {
   score: number;
   band: GrillBand;
   version: number;
-  skills: { score: number; max: number; matched: string[]; missing: string[]; note?: string };
-  location: { score: number; max: number; workMode: WorkModeValue; reason: string };
+  skills: {
+    score: number; max: number; matched: string[]; missing: string[]; note?: string;
+    nice: { matched: string[]; missing: string[]; source: 'nice_to_have' | 'none' };
+  };
   experience: { score: number; max: number; requiredMin: number | null; requiredMax: number | null; have: number | null; reason: string };
-  keywords: { score: number; max: number; matched: string[]; missing: string[]; source: 'nice_to_have' | 'whole_jd' };
+  location: { score: number; max: number; workMode: WorkModeValue; reason: string };
+  salary: { score: number; max: number; offeredMin: number | null; offeredMax: number | null; expected: number | null; reason: string };
+  // Every JD skill missing from the profile, required ones first.
+  missingKeywords: string[];
 };
 
 // Red < 50, Yellow 50-74, Green 75+.
@@ -78,6 +89,9 @@ export const SKILL_LEXICON = [
   'java', 'javascript', 'typescript', 'react', 'node.js', 'golang', 'aws', 'azure', 'gcp', 'devops', 'kubernetes',
   'data engineering', 'machine learning', 'ai', 'cloud', 'cybersecurity', 'sap', 'salesforce',
 ];
+
+// Naming any of these counts as "ATS" experience.
+const ATS_TOOLS = ['greenhouse', 'lever', 'ashby', 'workday', 'successfactors', 'smartrecruiters', 'icims', 'taleo', 'jobvite', 'darwinbox', 'zoho recruit', 'bamboohr'];
 
 // Two spellings that mean the same skill. Keys and values are normalized terms.
 const ALIASES: Record<string, string[]> = {
@@ -202,16 +216,25 @@ export function parseYearsRequirement(text: string): { min: number; max: number 
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
-function scoreSkills(profile: GrillProfile, required: string, fullJd: string) {
+function scoreSkills(profile: GrillProfile, split: ReturnType<typeof splitJd>, title: string, fullJd: string): GrillResult['skills'] {
   const max = GRILL_WEIGHTS.skills;
   const vocab = [...SKILL_LEXICON, ...profile.skills];
-  const jdTerms = extractTerms(required || fullJd, vocab);
-  const profileCanon = new Set(profile.skills.map(canonical));
-  const matched = jdTerms.filter((t) => profileCanon.has(canonical(t)) || profile.skills.some((s) => termInText(t, s.toLowerCase())));
-  const missing = jdTerms.filter((t) => !matched.includes(t));
-  if (!profile.skills.length) return { score: 0, max, matched: [], missing, note: 'Add skills to your profile.' };
-  if (!jdTerms.length) return { score: max / 2, max, matched: [], missing: [], note: 'The JD names no skills the Grill recognises; scored neutral.' };
-  return { score: round1((max * matched.length) / jdTerms.length), max, matched, missing };
+  const evidence = `${profile.skills.join('\n')}\n${profile.text || ''}`.toLowerCase();
+  const anyAts = ATS_TOOLS.some((a) => termInText(a, evidence));
+  const has = (t: string) => (canonical(t) === 'ats' && anyAts)
+    || profile.skills.some((s) => canonical(s) === canonical(t) || termInText(t, s.toLowerCase())) || termInText(t, evidence);
+  const reqTerms = extractTerms(split.required ? `${title}\n${split.required}` : fullJd, vocab);
+  const niceTerms = split.hasNiceSection ? extractTerms(split.nice, vocab).filter((t) => !reqTerms.some((r) => canonical(r) === canonical(t))) : [];
+  const matched = reqTerms.filter(has);
+  const missing = reqTerms.filter((t) => !matched.includes(t));
+  const niceMatched = niceTerms.filter(has);
+  const nice = { matched: niceMatched, missing: niceTerms.filter((t) => !niceMatched.includes(t)), source: split.hasNiceSection ? 'nice_to_have' as const : 'none' as const };
+  if (!profile.skills.length) return { score: 0, max, matched: [], missing, nice, note: 'Add skills to your profile.' };
+  if (!reqTerms.length && !niceTerms.length) return { score: max / 2, max, matched: [], missing: [], nice, note: 'The JD names no skills the Grill recognises; scored neutral.' };
+  const reqRatio = reqTerms.length ? matched.length / reqTerms.length : 0.5;
+  // Without a nice-to-have list the required ratio carries all 40 points.
+  const niceRatio = niceTerms.length ? niceMatched.length / niceTerms.length : reqRatio;
+  return { score: round1(max * (SKILLS_REQUIRED_SHARE * reqRatio + (1 - SKILLS_REQUIRED_SHARE) * niceRatio)), max, matched, missing, nice };
 }
 
 function scoreLocation(profile: GrillProfile, job: GrillJob) {
@@ -261,27 +284,29 @@ function scoreExperience(profile: GrillProfile, required: string, fullJd: string
   return { ...base, score: round1(max * ratio), reason: `You have ${have} years; the JD asks for at least ${req.min}.` };
 }
 
-function scoreKeywords(profile: GrillProfile, split: ReturnType<typeof splitJd>, fullJd: string) {
-  const max = GRILL_WEIGHTS.keywords;
-  const vocab = [...SKILL_LEXICON, ...profile.skills];
-  const source = split.hasNiceSection ? 'nice_to_have' as const : 'whole_jd' as const;
-  const terms = extractTerms(split.hasNiceSection ? split.nice : fullJd, vocab);
-  const evidence = `${profile.skills.join('\n')}\n${profile.text || ''}`.toLowerCase();
-  const matched = terms.filter((t) => termInText(t, evidence));
-  const missing = terms.filter((t) => !matched.includes(t));
-  if (!terms.length) return { score: split.hasNiceSection ? max / 2 : 0, max, matched, missing, source };
-  return { score: round1((max * matched.length) / terms.length), max, matched, missing, source };
+function scoreSalary(profile: GrillProfile, job: GrillJob): GrillResult['salary'] {
+  const max = GRILL_WEIGHTS.salary;
+  const expected = profile.expectedSalaryLpa && profile.expectedSalaryLpa > 0 ? profile.expectedSalaryLpa : null;
+  const offered = parseSalaryLpa(job.salary) ?? parseSalaryLpa(salaryFromText(job.description));
+  const base = { max, expected, offeredMin: offered?.min ?? null, offeredMax: offered?.max ?? null };
+  if (!offered) return { ...base, score: max / 2, reason: 'The posting does not state pay; scored half.' };
+  const range = `${offered.min === offered.max ? offered.min : `${offered.min}-${offered.max}`} LPA${offered.approx ? ' (converted, approx.)' : ''}`;
+  if (!expected) return { ...base, score: max / 2, reason: `Pays ${range}. Add your expected CTC to your profile to score this.` };
+  if (offered.max >= expected) return { ...base, score: max, reason: `Pays ${range}; you want ${expected} LPA or more.` };
+  if (offered.max >= expected * 0.85) return { ...base, score: max / 2, reason: `Pays up to ${offered.max} LPA, a little under your ${expected} LPA.` };
+  return { ...base, score: 0, reason: `Pays up to ${offered.max} LPA, well under your ${expected} LPA.` };
 }
 
 export function grill(profile: GrillProfile, job: GrillJob): GrillResult {
   const fullJd = `${job.title}\n${job.description || ''}`;
   const split = splitJd(job.description || '');
-  const skills = scoreSkills(profile, split.required ? `${job.title}\n${split.required}` : '', fullJd);
-  const location = scoreLocation(profile, job);
+  const skills = scoreSkills(profile, split, job.title, fullJd);
   const experience = scoreExperience(profile, split.required, fullJd);
-  const keywords = scoreKeywords(profile, split, fullJd);
-  const score = Math.max(0, Math.min(100, Math.round(skills.score + location.score + experience.score + keywords.score)));
-  return { score, band: grillBand(score), version: GRILL_VERSION, skills, location, experience, keywords };
+  const location = scoreLocation(profile, job);
+  const salary = scoreSalary(profile, job);
+  const score = Math.max(0, Math.min(100, Math.round(skills.score + experience.score + location.score + salary.score)));
+  const missingKeywords = [...new Set([...skills.missing, ...skills.nice.missing])];
+  return { score, band: grillBand(score), version: GRILL_VERSION, skills, experience, location, salary, missingKeywords };
 }
 
 // Total years from experience entries such as { start: "Jan 2018", end: "Present" }.

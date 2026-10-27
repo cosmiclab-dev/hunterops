@@ -62,6 +62,20 @@ function answer(system, messages) {
       practice_head: 'Hi Meera, your cloud practice looks busy with new reqs. I ran direct sourcing for Capgemini delivery teams, 70% without agencies. I can start Monday with zero notice. Worth a quick call about your hiring backlog? Divya',
     });
   }
+  if (/fill in job application questions/.test(system)) {
+    const user = messages.find((m) => m.role === 'user')?.content || '';
+    const keys = [...user.matchAll(/key "([^"]+)"/g)].map((m) => m[1]);
+    const answers = {};
+    for (const k of keys) {
+      const line = user.split('\n').find((l) => l.includes(`key "${k}"`)) || '';
+      const opts = line.match(/\(options: (.+)\)/);
+      answers[k] = opts ? opts[1].split(' | ')[0] : 'Your GCC is scaling tech hiring, which is the work I led at Capgemini: 120 tech roles in 12 months at 38 days time to fill.';
+    }
+    return JSON.stringify({ answers });
+  }
+  if (/ASD-STE100/.test(system)) {
+    return 'I led tech hiring at Capgemini. We hired 120 engineers in 12 months.';
+  }
   if (/explaining a career gap/.test(system)) {
     return JSON.stringify({
       email: 'Since November 2025 I have taken a planned break after five years of high-volume hiring at Capgemini. I used the time to get hands-on with AI-assisted sourcing and market mapping. I can join immediately with no notice period.',

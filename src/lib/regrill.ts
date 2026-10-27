@@ -1,15 +1,15 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from './db';
 import { grill } from './modules/grill';
-import { loadProfile, toGrillProfile } from './profile';
+import { loadProfile, profileIsEmpty, toGrillProfile } from './profile';
 import { HttpError } from './http';
 
 // Re-scores jobs against the current profile (after a profile edit, or on demand).
 export async function regrill(where: Prisma.JobWhereInput = { status: { not: 'DISMISSED' } }) {
   const profile = await loadProfile();
-  if (!profile) throw new HttpError(400, 'Save your profile first.');
+  if (!profile || profileIsEmpty(profile)) throw new HttpError(400, 'Set up your profile first: upload your CV on the Home page.');
   const gp = toGrillProfile(profile);
-  const jobs = await prisma.job.findMany({ where, select: { id: true, title: true, location: true, description: true, workMode: true } });
+  const jobs = await prisma.job.findMany({ where, select: { id: true, title: true, location: true, description: true, workMode: true, salary: true } });
   const now = new Date();
   const results = jobs.map((j) => ({ id: j.id, g: grill(gp, j) }));
   // Batches of updates in one transaction each keep round trips low on Neon.

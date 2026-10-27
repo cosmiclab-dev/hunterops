@@ -11,7 +11,7 @@ export function applyTheme(pref: ThemePref) {
   root.classList.toggle('dark', dark);
   root.dataset.theme = pref;
   const meta = document.querySelector('meta[name="theme-color"]:not([media])') as HTMLMetaElement | null;
-  if (meta) meta.content = dark ? '#0A0B10' : '#F7F7F9';
+  if (meta) meta.content = dark ? '#09090B' : '#FFFFFF';
 }
 
 export function readTheme(): ThemePref {

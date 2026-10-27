@@ -8,6 +8,7 @@ const profile: GrillProfile = {
   acceptHybrid: true,
   onsiteCities: ['Bengaluru'],
   text: 'Senior recruiter. Built GCC hiring from zero. Used Workday and Power BI dashboards.',
+  expectedSalaryLpa: 22,
 };
 
 const JD = `Senior Talent Acquisition Partner
@@ -22,8 +23,8 @@ Nice to have
 - Campus hiring`;
 
 describe('Module D: The Grill', () => {
-  it('uses the agreed weights', () => {
-    expect(GRILL_WEIGHTS).toEqual({ skills: 40, location: 20, experience: 20, keywords: 20 });
+  it('uses the career-ops weights: hard skills 40, experience 20, location 20, salary 20', () => {
+    expect(GRILL_WEIGHTS).toEqual({ skills: 40, experience: 20, location: 20, salary: 20 });
   });
 
   it('bands scores: red < 50, yellow < 75, green 75+', () => {
@@ -57,15 +58,29 @@ describe('Module D: The Grill', () => {
   });
 
   it('scores a strong Bengaluru match green', () => {
-    const g = grill(profile, { title: 'Senior Talent Acquisition Partner', location: 'Bengaluru, India', description: JD });
+    const g = grill(profile, { title: 'Senior Talent Acquisition Partner', location: 'Bengaluru, India', description: JD, salary: 'INR 20,00,000 – 28,00,000' });
     expect(g.location.score).toBe(20);
     expect(g.experience.score).toBe(20);
+    expect(g.salary.score).toBe(20);
     expect(g.skills.score).toBeGreaterThanOrEqual(30);
-    expect(g.keywords.source).toBe('nice_to_have');
-    expect(g.keywords.matched).toEqual(expect.arrayContaining(['gcc', 'power bi']));
+    expect(g.skills.nice.source).toBe('nice_to_have');
+    expect(g.skills.nice.matched).toEqual(expect.arrayContaining(['gcc', 'power bi']));
+    expect(g.missingKeywords).toEqual(['campus hiring']);
     expect(g.score).toBeGreaterThanOrEqual(75);
     expect(g.band).toBe('green');
-    expect(g.score).toBe(Math.round(g.skills.score + g.location.score + g.experience.score + g.keywords.score));
+    expect(g.version).toBe(2);
+    expect(g.score).toBe(Math.round(g.skills.score + g.location.score + g.experience.score + g.salary.score));
+  });
+
+  it('scores salary fit against expected CTC', () => {
+    const base = { title: 'Recruiter', location: 'Bengaluru', description: JD };
+    expect(grill(profile, { ...base, salary: '₹25-30 LPA' }).salary.score).toBe(20);
+    expect(grill(profile, { ...base, salary: '₹15-19 LPA' }).salary.score).toBe(10);
+    expect(grill(profile, { ...base, salary: '₹8-10 LPA' }).salary.score).toBe(0);
+    expect(grill(profile, base).salary).toMatchObject({ score: 10, reason: expect.stringMatching(/does not state pay/) });
+    expect(grill({ ...profile, expectedSalaryLpa: null }, { ...base, salary: '₹25 LPA' }).salary.reason).toMatch(/expected CTC/);
+    // Pay found in the JD text when the posting has no salary field.
+    expect(grill(profile, { ...base, description: `${JD}\nCTC: 24-30 LPA` }).salary.score).toBe(20);
   });
 
   it('is strict on location', () => {

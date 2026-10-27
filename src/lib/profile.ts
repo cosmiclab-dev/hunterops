@@ -25,6 +25,10 @@ export type ResumeData = {
 
 export type ProfileInput = ResumeData & {
   yearsExperience: number | null;
+  // Job-application facts used by the Grill's salary fit and the Browser's auto-fill.
+  expectedSalaryLpa: number | null;
+  currentCtcLpa: number | null;
+  noticePeriod: string;
   acceptRemote: boolean;
   acceptHybrid: boolean;
   onsiteCities: string[];
@@ -72,8 +76,15 @@ export function normalizeResume(input: any = {}): ResumeData {
 export function normalizeProfile(input: any = {}): ProfileInput {
   const r = normalizeResume(input);
   const yrs = Number(input.yearsExperience ?? input.years);
+  const lpa = (v: unknown) => {
+    const n = Number(v);
+    return v !== null && v !== '' && Number.isFinite(n) && n > 0 && n < 2000 ? Math.round(n * 10) / 10 : null;
+  };
   return {
     ...r,
+    expectedSalaryLpa: lpa(input.expectedSalaryLpa),
+    currentCtcLpa: lpa(input.currentCtcLpa),
+    noticePeriod: asText(input.noticePeriod, 60),
     yearsExperience: Number.isFinite(yrs) && yrs > 0 && yrs < 60 ? Math.round(yrs * 10) / 10 : yearsFromExperience(r.experience),
     acceptRemote: input.acceptRemote !== false,
     acceptHybrid: input.acceptHybrid !== false,
@@ -91,18 +102,20 @@ export async function loadProfile(): Promise<ProfileInput | null> {
   return row ? profileFromRow(row) : null;
 }
 
+export const profileIsEmpty = (p: ProfileInput | null) => !p || (!p.experience.length && !p.summary && !p.skills.length);
+
 export async function requireProfile() {
   const p = await loadProfile();
-  if (!p || (!p.experience.length && !p.summary && !p.skills.length)) {
-    throw new HttpError(400, 'Fill in your profile first: import your resume on the Profile page.');
+  if (!p || profileIsEmpty(p)) {
+    throw new HttpError(400, 'Set up your profile first: upload your CV on the Home page or the Profile page.');
   }
   return p;
 }
 
 export async function saveProfile(input: unknown) {
   const p = normalizeProfile(input);
-  const { experience, education, certifications, achievements, ...cols } = p;
-  const data = { experience, education, certifications, achievements };
+  const { experience, education, certifications, achievements, expectedSalaryLpa, currentCtcLpa, noticePeriod, ...cols } = p;
+  const data = { experience, education, certifications, achievements, expectedSalaryLpa, currentCtcLpa, noticePeriod };
   await prisma.profile.upsert({
     where: { id: 1 },
     create: { id: 1, ...cols, data },
@@ -119,6 +132,7 @@ export function toGrillProfile(p: ProfileInput): GrillProfile {
     acceptHybrid: p.acceptHybrid,
     onsiteCities: p.onsiteCities,
     text: profileToText(p),
+    expectedSalaryLpa: p.expectedSalaryLpa,
   };
 }
 

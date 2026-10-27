@@ -33,6 +33,7 @@ const config: Config = {
         success: 'hsl(var(--success))',
         warning: 'hsl(var(--warning))',
         info: 'hsl(var(--info))',
+        sidebar: 'hsl(var(--sidebar))',
         // Grill Score bands.
         grill: { red: '#DC2626', yellow: '#CA8A04', green: '#16A34A' },
       },

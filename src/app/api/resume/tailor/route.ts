@@ -10,10 +10,11 @@ import { normalizeResume, requireProfile } from '@/lib/profile';
 import { tailorResumeMessages } from '@/lib/prompts';
 import { renderPdf } from '@/lib/resume-render';
 import { loadSettings } from '@/lib/settings';
-import { writeClean } from '@/lib/writer';
+import { extraBanned, writeClean } from '@/lib/writer';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// AI writing with thinking models: a draft plus one Anti-Slop rewrite can take minutes.
+export const maxDuration = 300;
 
 const Body = z.object({ jobId: z.string().uuid(), density: z.enum(['standard', 'compact']).default('standard') });
 
@@ -25,7 +26,8 @@ export const POST = route(async (req: Request) => {
   if (!job) throw new HttpError(404, 'Job not found.');
   if (!job.description || job.description.length < 100) throw new HttpError(400, 'This job has no description to tailor against. Add one first.');
   const profile = await requireProfile();
-  const cfg = llmConfig(await loadSettings());
+  const settings = await loadSettings();
+  const cfg = llmConfig(settings);
   const missing = ((job.grillBreakdown as unknown as GrillResult | null)?.skills.missing ?? []).slice(0, 15);
   const { experience, education, certifications, achievements, skills, summary, name, headline, email, phone, location, linkedin, portfolio } = profile;
   const out = await writeClean(cfg, tailorResumeMessages({
@@ -34,7 +36,10 @@ export const POST = route(async (req: Request) => {
     title: job.title,
     company: job.company,
     missing,
-  }), { maxTokens: 6000, temperature: 0.3 });
+  }), {
+    maxTokens: 6000, temperature: 0.3, extra: extraBanned(settings),
+    check: (d: any) => ({ ...d, notes_for_candidate: undefined }),
+  });
   const data = normalizeResume(out.data);
   // Contact details always come from the profile, never from the model.
   Object.assign(data, { name, email, phone, location, linkedin, portfolio });

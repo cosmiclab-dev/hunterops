@@ -57,7 +57,7 @@ export const RULES: Record<BannedPhrase, Rule> = {
 };
 
 export type SlopHit = {
-  phrase: BannedPhrase;
+  phrase: string;
   match: string;
   index: number;
   length: number;
@@ -70,7 +70,7 @@ export type SlopReport = {
   score: number;      // 100 = clean; each hit costs points
   clean: boolean;
   hits: SlopHit[];
-  counts: Partial<Record<BannedPhrase, number>>;
+  counts: Record<string, number>;
   words: number;
 };
 
@@ -87,10 +87,30 @@ const PATTERNS: [BannedPhrase, RegExp][] = BANNED_PHRASES.map((p) => {
 
 const PENALTY_PER_HIT = 8;
 
-export function scanSlop(text: string): SlopReport {
+// Extra words the person added in Settings ("stored banned words"): no replacement, just cut.
+const extraCache = new Map<string, RegExp>();
+function extraPattern(word: string) {
+  let re = extraCache.get(word);
+  if (!re) {
+    re = new RegExp(`(?<![\\w-])${escape(word).replace(/\\-|\s+|-/g, '[\\s\\-]+')}(?![\\w-])`, 'gi');
+    extraCache.set(word, re);
+  }
+  return re;
+}
+const EXTRA_RULE = { replacement: null, why: 'On your own banned list in Settings.' };
+
+export function parseExtraBanned(raw: string | null | undefined): string[] {
+  return [...new Set(String(raw || '').split(/[,\n]/).map((w) => w.trim().toLowerCase()).filter((w) => w.length >= 2 && w.length <= 60))].slice(0, 100);
+}
+
+export function scanSlop(text: string, extra: string[] = []): SlopReport {
   const src = String(text ?? '');
   const hits: SlopHit[] = [];
-  for (const [phrase, re] of PATTERNS) {
+  const patterns: [string, RegExp, { replacement: string | null; why: string }][] = [
+    ...PATTERNS.map(([p, re]) => [p, re, RULES[p]] as [string, RegExp, Rule]),
+    ...extra.filter((w) => !(BANNED_PHRASES as readonly string[]).includes(w)).map((w) => [w, extraPattern(w), EXTRA_RULE] as [string, RegExp, typeof EXTRA_RULE]),
+  ];
+  for (const [phrase, re, rule] of patterns) {
     re.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(src))) {
@@ -101,8 +121,8 @@ export function scanSlop(text: string): SlopReport {
         match: m[0],
         index: m.index,
         length: m[0].length,
-        replacement: RULES[phrase].replacement,
-        why: RULES[phrase].why,
+        replacement: rule.replacement,
+        why: rule.why,
         context: `${start > 0 ? '…' : ''}${src.slice(start, end).replace(/\s+/g, ' ')}${end < src.length ? '…' : ''}`,
       });
     }
@@ -116,7 +136,7 @@ export function scanSlop(text: string): SlopReport {
     kept.push(h);
     until = h.index + h.length;
   }
-  const counts: Partial<Record<BannedPhrase, number>> = {};
+  const counts: Record<string, number> = {};
   for (const h of kept) counts[h.phrase] = (counts[h.phrase] ?? 0) + 1;
   const words = src.trim() ? src.trim().split(/\s+/).length : 0;
   return {
@@ -130,8 +150,8 @@ export function scanSlop(text: string): SlopReport {
 
 // Swaps every hit that has a one-word replacement, keeping the first letter's case.
 // Hits without a safe replacement are left for the person (or the model) to rewrite.
-export function applySafeFixes(text: string): { text: string; fixed: number; remaining: SlopHit[] } {
-  const report = scanSlop(text);
+export function applySafeFixes(text: string, extra: string[] = []): { text: string; fixed: number; remaining: SlopHit[] } {
+  const report = scanSlop(text, extra);
   let out = '';
   let last = 0;
   let fixed = 0;
@@ -150,9 +170,17 @@ export function applySafeFixes(text: string): { text: string; fixed: number; rem
   return { text: out, fixed, remaining };
 }
 
+// The spec's entry point: { hasSlop, findings } for any text.
+export function scanForSlop(text: string, extra: string[] = []): { hasSlop: boolean; findings: string[] } {
+  const r = scanSlop(text, extra);
+  return { hasSlop: !r.clean, findings: [...new Set(r.hits.map((h) => h.match.toLowerCase()))] };
+}
+
+export const slopRejection = (findings: string[]) => `Draft rejected due to low-quality AI patterns: ${findings.join(', ')}.`;
+
 // The instruction block every writing prompt includes.
-export function antiSlopInstruction() {
-  return `Style rules: write plain, specific English. Never use these words or phrases (or their other forms): ${BANNED_PHRASES.map((p) => `"${p}"`).join(', ')}. Prefer concrete verbs ("led", "built", "cut", "hired") and real numbers from the source.`;
+export function antiSlopInstruction(extra: string[] = []) {
+  return `Style rules: write plain, specific English. Never use these words or phrases (or their other forms): ${[...BANNED_PHRASES, ...extra].map((p) => `"${p}"`).join(', ')}. Prefer concrete verbs ("led", "built", "cut", "hired") and real numbers from the source.`;
 }
 
 // Text the model can act on when its draft has hits.

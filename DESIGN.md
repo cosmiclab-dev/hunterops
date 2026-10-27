@@ -57,13 +57,14 @@ If you change a value, change it in `designer.ts` and here, in the same commit.
 
 ## App themes
 
-The resume rules above are strict Switzerland Style. The app itself uses the same type (Inter, Roboto Mono) and 4px grid, with two themes on one set of CSS tokens in `src/app/globals.css`:
+The resume rules above are strict Switzerland Style. The app is a flat shadcn/ui dashboard on one set of CSS tokens in `src/app/globals.css` (zinc neutrals), with Inter and Roboto Mono and the 4px grid:
 
-- **Light:** `#111111` text and white cards on a very light grey page, `#E5E5E5` borders.
-- **Dark ("command center"):** near-black page (`hsl(228 24% 5%)`), slightly raised cards, soft light text.
-- **Accent:** one violet accent for actions and the active tab, plus status colours (success, warning, info) for pipeline stages and reminders. The Grill Score bands stay red, yellow and green in both themes.
-- **Auto** follows the phone's light or dark mode; Settings and the header button can force Light or Dark. The choice is stored in the browser.
-- Cards: 16px radius, 1px border, soft shadow. Buttons and chips are pills. Single column on phones with a five-tab bottom bar; wider grids from 768px.
+- **Shell:** a fixed 240px left sidebar from 1024px wide (Workspace: Home, Discover, Pipeline, Browser, Mailroom; Library: All jobs, Profile, Settings). Phones get a top bar and a five-tab bottom bar. Content is capped at 1152px, except Pipeline and Browser, which use the full width.
+- **Light:** white page, `#09090B` text, zinc borders. **Dark:** `#09090B` page with slightly raised cards.
+- **Accent:** one indigo primary for actions; status colours for pipeline dots and reminders. Grill bands stay red (under 50), yellow (under 75) and green (75+) in both themes.
+- **Surfaces:** 8px radius, 1px border, almost no shadow. Buttons are 40px (32px small) with 6px radius. Chips turn solid when on.
+- **Auto** follows the device; Settings and the theme button can force Light or Dark.
+- **Checks:** the end-to-end UI pass fails if any screen scrolls sideways at 1280px or on an iPhone.
 
 ## Density variants
 

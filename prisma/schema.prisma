@@ -106,6 +106,7 @@ model Job {
   emails         Email[]
   contacts       Contact[]
   outreach       Outreach[]
+  artifact       Artifact?
 
   @@index([status, firstSeenAt(sort: Desc)])
   @@index([grillScore(sort: Desc)])
@@ -188,6 +189,21 @@ model Outreach {
   @@index([createdAt(sort: Desc)])
   @@index([status, followUpAt])
   @@map("outreach_logs")
+}
+
+// What HunterOps produced for one job: the cover letter, the tailored resume
+// to download, the email drafts and the application answer sheet (auto-fill).
+model Artifact {
+  id              String   @id @default(uuid()) @db.Uuid
+  jobId           String   @unique @map("job_id") @db.Uuid
+  job             Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  coverLetterText String?  @map("cover_letter_text")
+  resumePdfPath   String?  @map("resume_pdf_path")
+  emailDrafts     Json     @default("[]") @map("email_drafts")
+  autofill        Json?
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("artifacts")
 }
 
 model ScanRun {

@@ -1,0 +1,114 @@
+// The Browser's Auto-Fill: an answer for every field of an application form,
+// from the master profile, with the model drafting the free-text questions.
+// The person copies each answer into the real form and presses Submit there.
+import type { FormField } from './html';
+import type { ProfileInput } from './profile';
+import { profileToText } from './profile';
+import type { ChatMessage, LlmConfig } from './llm/client';
+import { antiSlopInstruction } from './modules/anti-slop';
+import { writeClean } from './writer';
+
+export type Answer = { key: string; label: string; type: FormField['type']; required: boolean; value: string; source: 'profile' | 'ai' | 'you'; note?: string; options?: string[] };
+
+// Fields almost every application asks for, used when the page exposes no form.
+export const STANDARD_FIELDS: FormField[] = [
+  { key: 'first_name', label: 'First name', type: 'text', required: true },
+  { key: 'last_name', label: 'Last name', type: 'text', required: true },
+  { key: 'email', label: 'Email', type: 'email', required: true },
+  { key: 'phone', label: 'Phone', type: 'tel', required: true },
+  { key: 'location', label: 'Current location', type: 'text', required: false },
+  { key: 'linkedin', label: 'LinkedIn profile', type: 'url', required: false },
+  { key: 'current_company', label: 'Current or last company', type: 'text', required: false },
+  { key: 'current_title', label: 'Current or last title', type: 'text', required: false },
+  { key: 'experience', label: 'Total years of experience', type: 'number', required: false },
+  { key: 'current_ctc', label: 'Current CTC (LPA)', type: 'text', required: false },
+  { key: 'expected_ctc', label: 'Expected CTC (LPA)', type: 'text', required: false },
+  { key: 'notice', label: 'Notice period', type: 'text', required: false },
+  { key: 'resume', label: 'Resume / CV', type: 'file', required: true },
+  { key: 'why_company', label: 'Why do you want to work here?', type: 'textarea', required: false },
+];
+
+type Rule = [RegExp, (p: ProfileInput) => string, string?];
+const first = (p: ProfileInput) => p.name.trim().split(/\s+/)[0] || '';
+const last = (p: ProfileInput) => p.name.trim().split(/\s+/).slice(1).join(' ');
+const lpa = (n: number | null) => (n ? `${n} LPA` : '');
+
+// Label patterns, most specific first.
+const RULES: Rule[] = [
+  [/first\s*name|given name|^name\s*\(first/i, first],
+  [/last\s*name|surname|family name/i, last],
+  [/preferred name/i, first],
+  [/full\s*name|^name\b|your name|legal name/i, (p) => p.name],
+  [/e-?mail/i, (p) => p.email],
+  [/phone|mobile|contact number/i, (p) => p.phone],
+  [/linked\s*in/i, (p) => p.linkedin],
+  [/portfolio|website|personal (site|url)|github/i, (p) => p.portfolio],
+  [/expected (ctc|salary|compensation|pay)|salary expectation|desired (salary|pay)/i, (p) => lpa(p.expectedSalaryLpa), 'Your expected CTC from Profile.'],
+  [/current (ctc|salary|compensation)|present (ctc|salary)/i, (p) => lpa(p.currentCtcLpa)],
+  [/notice period|when can you (start|join)|earliest start|availability to join|joining date/i, (p) => p.noticePeriod],
+  [/current (company|employer|organi[sz]ation)|most recent (company|employer)|^company$|^org$/i, (p) => p.experience[0]?.company || ''],
+  [/current (title|role|designation|position)|job title|most recent title/i, (p) => p.experience[0]?.title || ''],
+  [/years of (relevant )?experience|total experience|how many years/i, (p) => (p.yearsExperience ? String(p.yearsExperience) : '')],
+  [/(current )?(location|city)|where are you based|address/i, (p) => p.location],
+  [/school|university|college/i, (p) => p.education[0]?.school || ''],
+  [/degree|qualification/i, (p) => p.education[0]?.degree || ''],
+];
+
+const FREE_TEXT = /why|tell us|describe|cover letter|additional information|anything else|motivat|interest(ed)? in|about yourself|summary|example of|how would you/i;
+
+export function mapField(f: FormField, p: ProfileInput): Answer {
+  const base = { key: f.key, label: f.label, type: f.type, required: f.required, options: f.options };
+  if (f.type === 'file') {
+    return { ...base, value: /cover/i.test(f.label) ? '' : 'Attach your tailored resume (Resume tab)', source: 'you', note: /cover/i.test(f.label) ? 'Use the cover letter from the Email tab.' : undefined };
+  }
+  if (!FREE_TEXT.test(f.label) || f.type !== 'textarea') {
+    for (const [re, get, note] of RULES) {
+      if (re.test(f.label) || re.test(f.key.replace(/[_\-[\]]+/g, ' '))) {
+        const value = get(p);
+        return { ...base, value, source: value ? 'profile' : 'you', note: value ? note : 'Add this to your Profile once and it fills every form.' };
+      }
+    }
+  }
+  return { ...base, value: '', source: 'ai' };
+}
+
+function questionMessages(a: { questions: Answer[]; company: string; role: string; jd: string; profile: ProfileInput }): ChatMessage[] {
+  const system = `You fill in job application questions for the candidate, in the first person, from their profile only.
+Rules:
+- Free-text answers: 40 to 120 words, specific to the company and role, using real facts from the profile. Never invent numbers, employers or tools; write [X] where a figure is needed and missing.
+- For a question with options, reply with exactly one of the options.
+- For a yes/no eligibility question you cannot answer from the profile, reply "[Check]".
+- ${antiSlopInstruction()}
+Reply with one JSON object and nothing else: { "answers": { "<key>": "<answer>" } }`;
+  const user = [
+    `Company: ${a.company}`,
+    `Role: ${a.role}`,
+    `Job description (excerpt):\n"""\n${a.jd.slice(0, 3500)}\n"""`,
+    `Questions:\n${a.questions.map((q) => `- key "${q.key}": ${q.label}${q.options?.length ? ` (options: ${q.options.join(' | ')})` : ''}`).join('\n')}`,
+    `Candidate profile:\n"""\n${profileToText(a.profile).slice(0, 6000)}\n"""`,
+  ].join('\n\n');
+  return [{ role: 'system', content: system }, { role: 'user', content: user }];
+}
+
+export async function buildAnswerSheet(cfg: LlmConfig | null, a: {
+  fields: FormField[]; profile: ProfileInput; company: string; role: string; jd: string; extra?: string[];
+}) {
+  const fields = a.fields.length ? a.fields : STANDARD_FIELDS;
+  const answers = fields.map((f) => mapField(f, a.profile));
+  const open = answers.filter((x) => x.source === 'ai').slice(0, 10);
+  let model: string | null = null;
+  if (open.length && cfg) {
+    const out = await writeClean<{ answers?: Record<string, string> }>(cfg, questionMessages({ questions: open, company: a.company, role: a.role, jd: a.jd, profile: a.profile }), {
+      maxTokens: 2500, temperature: 0.4, extra: a.extra,
+    });
+    model = out.model;
+    const got = out.data?.answers || {};
+    for (const q of open) {
+      const v = String(got[q.key] ?? '').trim().slice(0, 2000);
+      q.value = v;
+      if (!v) q.source = 'you';
+    }
+  }
+  for (const q of answers) if (q.source === 'ai' && !q.value) q.source = 'you';
+  return { answers, generic: !a.fields.length, model };
+}

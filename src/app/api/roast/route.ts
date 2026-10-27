@@ -4,10 +4,12 @@ import { llmConfig } from '@/lib/llm/client';
 import { loadProfile, profileToText } from '@/lib/profile';
 import { roastMessages } from '@/lib/prompts';
 import { loadSettings } from '@/lib/settings';
-import { writeClean } from '@/lib/writer';
+import { extraBanned, writeClean } from '@/lib/writer';
+import { applySafeFixes } from '@/lib/modules/anti-slop';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// AI writing with thinking models: a draft plus one Anti-Slop rewrite can take minutes.
+export const maxDuration = 300;
 
 const Body = z.object({
   bullets: z.string().trim().min(10, 'Paste at least one bullet').max(12000),
@@ -28,9 +30,23 @@ const s = (v: unknown, max = 600) => String(v ?? '').trim().slice(0, max);
 export const POST = route(async (req: Request) => {
   const body = Body.parse(await readJson(req, 64 * 1024));
   const profile = await loadProfile();
-  const out = await writeClean<Roast>(llmConfig(await loadSettings()), roastMessages({
+  const settings = await loadSettings();
+  const out = await writeClean<Roast>(llmConfig(settings), roastMessages({
     bullets: body.bullets, domain: body.domain, target: body.target, profileText: profile ? profileToText(profile) : undefined,
-  }), { maxTokens: 2600, temperature: 0.4 });
+  }), {
+    maxTokens: 2600, temperature: 0.4, extra: extraBanned(settings),
+    // The critique quotes the person's own bullets; only the new text has to be clean.
+    check: (d: Roast) => [d?.critique?.map((c) => c?.rewrite), d?.rewrites, d?.summary],
+    fix: (d: Roast, extra: string[]) => {
+      const f = (t?: string) => (t ? applySafeFixes(t, extra).text : t);
+      return {
+        ...d,
+        critique: d?.critique?.map((c) => ({ ...c, rewrite: f(c?.rewrite) })),
+        rewrites: d?.rewrites?.map((r) => ({ ...r, bullet: f(r?.bullet) })),
+        summary: f(d?.summary),
+      };
+    },
+  });
   const d = out.data || {};
   const critique = (Array.isArray(d.critique) ? d.critique : []).slice(0, 20).map((c) => ({
     original: s(c?.original), why: s(c?.why_rejected), verdict: s(c?.verdict, 20) || 'Rewrite', rewrite: s(c?.rewrite),

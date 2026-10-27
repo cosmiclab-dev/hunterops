@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import { Nav } from '@/components/nav';
+import { Frame, Nav } from '@/components/nav';
 import { THEME_SCRIPT } from '@/lib/theme';
 
 export const metadata: Metadata = {
@@ -14,8 +14,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#F7F7F9' },
-    { media: '(prefers-color-scheme: dark)', color: '#0A0B10' },
+    { media: '(prefers-color-scheme: light)', color: '#FFFFFF' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090B' },
   ],
 };
 
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-dvh">
         <Nav />
-        <main className="mx-auto w-full max-w-5xl px-4 pb-32 pt-5 md:px-8 md:pb-16 md:pt-8">{children}</main>
+        <Frame>{children}</Frame>
       </body>
     </html>
   );

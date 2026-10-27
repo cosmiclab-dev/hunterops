@@ -122,7 +122,8 @@ function readContent(cfg: LlmConfig, data: any): string | undefined {
 
 export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
   if (!opts.session) opts = { ...opts, session: crypto.randomUUID() };
-  const timeoutMs = opts.timeoutMs ?? 55_000;
+  // Thinking models can take well over a minute on long prompts.
+  const timeoutMs = opts.timeoutMs ?? 130_000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const { headers, body } = buildRequest(cfg, messages, opts);
