@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
+    // Never show a cached copy of a page after a save: every visit reads fresh data.
+    staleTimes: { dynamic: 0, static: 30 },
     // Server-only packages that should load from node_modules, not be bundled.
     serverComponentsExternalPackages: ['@prisma/client', 'unpdf', 'mammoth', 'nodemailer', 'docx', 'pdf-lib', '@pdf-lib/fontkit'],
     // Ship the font files the PDF renderer embeds with the serverless functions.

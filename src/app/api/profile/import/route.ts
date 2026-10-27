@@ -3,7 +3,7 @@ import { extractText } from '@/lib/extract';
 import { chatJson, llmConfig } from '@/lib/llm/client';
 import { parseResumeMessages } from '@/lib/prompts';
 import { loadProfile, normalizeProfile, profileIsEmpty, saveProfile } from '@/lib/profile';
-import { regrill } from '@/lib/regrill';
+import { regrillQuietly } from '@/lib/regrill';
 import { heuristicProfile } from '@/lib/resume-heuristic';
 import { loadSettings } from '@/lib/settings';
 
@@ -55,6 +55,6 @@ export const POST = route(async (req: Request) => {
     ? { ...draft, expectedSalaryLpa: prev.expectedSalaryLpa, currentCtcLpa: prev.currentCtcLpa, noticePeriod: prev.noticePeriod, acceptRemote: prev.acceptRemote, acceptHybrid: prev.acceptHybrid, onsiteCities: prev.onsiteCities }
     : draft;
   const profile = await saveProfile(merged);
-  const grilled = profileIsEmpty(profile) ? 0 : (await regrill()).length;
-  return ok({ draft: profile, saved: true, grilled, model, chars: text.length, warning });
+  const scored = profileIsEmpty(profile) ? { grilled: 0, warning: null } : await regrillQuietly();
+  return ok({ draft: profile, saved: true, grilled: scored.grilled, model, chars: text.length, warning: warning ?? scored.warning });
 });

@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { Plus, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api-client';
@@ -66,8 +67,12 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
         skills: skillsText.split(',').map((s) => s.trim()).filter(Boolean),
         onsiteCities: citiesText.split(',').map((s) => s.trim()).filter(Boolean),
       };
-      const { grilled } = await api<{ grilled: number }>('/api/profile', { method: 'PUT', json: { profile: body } });
-      setMsg(`Saved. ${grilled} jobs re-grilled.`);
+      const out = await api<{ profile: ProfileInput; grilled: number; warning: string | null }>('/api/profile', { method: 'PUT', json: { profile: body } });
+      // Show exactly what was stored.
+      setP(out.profile);
+      setSkillsText(out.profile.skills.join(', '));
+      setCitiesText(out.profile.onsiteCities.join(', '));
+      setMsg(out.warning ? `Saved. ${out.warning}` : `Saved. ${out.grilled} jobs re-scored.`);
       router.refresh();
     } catch (e) {
       setErr((e as Error).message);
@@ -105,7 +110,7 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
         <Field label="Location" id="location"><Input id="location" value={p.location} onChange={(e) => set('location', e.target.value)} /></Field>
         <Field label="LinkedIn" id="linkedin"><Input id="linkedin" value={p.linkedin} onChange={(e) => set('linkedin', e.target.value)} /></Field>
         <Field label="Years of experience" id="years">
-          <Input id="years" inputMode="decimal" value={p.yearsExperience ?? ''} onChange={(e) => set('yearsExperience', e.target.value ? Number(e.target.value) : null)} />
+          <NumberInput id="years" value={p.yearsExperience} onValue={(n) => set('yearsExperience', n)} />
         </Field>
         <Field label="Portfolio" id="portfolio"><Input id="portfolio" value={p.portfolio} onChange={(e) => set('portfolio', e.target.value)} /></Field>
       </section>
@@ -113,10 +118,10 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
       <section className="surface grid grid-cols-1 gap-4 p-4 md:grid-cols-3 md:p-5">
         <h2 className="section-title md:col-span-3">Pay and availability (Grill salary fit and Browser auto-fill)</h2>
         <Field label="Expected CTC (lakh per year)" id="expected">
-          <Input id="expected" inputMode="decimal" value={p.expectedSalaryLpa ?? ''} onChange={(e) => set('expectedSalaryLpa', e.target.value ? Number(e.target.value) : null)} placeholder="24" />
+          <NumberInput id="expected" value={p.expectedSalaryLpa} onValue={(n) => set('expectedSalaryLpa', n)} placeholder="24" />
         </Field>
         <Field label="Current or last CTC (lakh per year)" id="current">
-          <Input id="current" inputMode="decimal" value={p.currentCtcLpa ?? ''} onChange={(e) => set('currentCtcLpa', e.target.value ? Number(e.target.value) : null)} placeholder="18" />
+          <NumberInput id="current" value={p.currentCtcLpa} onValue={(n) => set('currentCtcLpa', n)} placeholder="18" />
         </Field>
         <Field label="Notice period" id="notice">
           <Input id="notice" value={p.noticePeriod} onChange={(e) => set('noticePeriod', e.target.value)} placeholder="Immediate (0 days)" />

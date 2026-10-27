@@ -207,12 +207,26 @@ ok('CV roaster: before/after rows');
 
 await page.goto(`${BASE}/profile`);
 assert.equal(await page.inputValue('#name'), 'Divya Sharma');
+await page.fill('#years', '');
+await page.locator('#years').pressSequentially('6.5');
+assert.equal(await page.inputValue('#years'), '6.5');
+await page.getByRole('button', { name: 'Save profile' }).click();
+await page.getByText(/jobs? re-scored|Saved/).first().waitFor();
+await page.getByRole('link', { name: 'Home' }).first().click();
+await page.waitForURL(`${BASE}/`);
+await page.getByRole('link', { name: 'Profile' }).first().click();
+await page.waitForURL(`${BASE}/profile`);
+assert.equal(await page.inputValue('#years'), '6.5');
 await shot('d11-profile');
 await page.goto(`${BASE}/settings`);
 assert.equal(await page.inputValue('#provider'), 'custom');
 await page.locator('#search').waitFor();
 await shot('d12-settings');
-ok('profile and settings load with saved values; web search section present');
+await page.getByRole('button', { name: 'Run self-test' }).click();
+await page.getByTestId('selftest-results').waitFor({ timeout: 60_000 });
+assert.equal(await page.locator('[data-check="db"]').getAttribute('data-ok'), 'true');
+await shot('d13-selftest');
+ok('profile: 6.5 years saves and shows after leaving the page; settings self-test runs');
 
 await page.getByRole('radio', { name: 'Dark' }).click();
 assert.equal(await page.evaluate(() => document.documentElement.classList.contains('dark')), true);

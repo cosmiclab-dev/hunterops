@@ -474,12 +474,25 @@ await step('Mailroom: an email draft without a job (company and role typed in)',
   assert.equal((await call('POST', '/api/emails', { toEmail: 'hr@orbit.example' })).status, 400);
 });
 
-await step('Discover in-app: no key shows the setup state; with a Serper key results arrive in the app', async () => {
-  const off = await call('POST', '/api/discover/search', { roles: ['Talent Acquisition'], locations: ['bengaluru', 'remote'], window: 'd' });
-  assert.equal(off.status, 200, JSON.stringify(off.data));
-  assert.equal(off.data.webEnabled, false);
-  assert.deepEqual(off.data.web, []);
-  assert.ok(off.data.board.some((j) => j.id === ghJob.id), 'fresh board job missing');
+await step('Discover in-app: free search (no key) finds ATS jobs and people; Serper still works', async () => {
+  const free = await call('POST', '/api/discover/search', { roles: ['Talent Acquisition'], locations: ['bengaluru', 'remote'], window: 'd', people: true });
+  assert.equal(free.status, 200, JSON.stringify(free.data));
+  assert.equal(free.data.webEnabled, true);
+  assert.equal(free.data.provider, 'free');
+  assert.ok(free.data.board.some((j) => j.id === ghJob.id), 'fresh board job missing');
+  const fgh = free.data.web.find((w) => w.ats === 'greenhouse');
+  assert.ok(fgh, JSON.stringify(free.data));
+  assert.equal(fgh.jobId, ghJob.id, 'saved Greenhouse job not matched');
+  assert.equal(free.data.people[0].name, 'Meera Iyer - Head of Talent Acquisition - Acme Cloud');
+  const st = await call('POST', '/api/selftest');
+  assert.equal(st.status, 200, JSON.stringify(st.data));
+  for (const id of ['db', 'profile', 'ai', 'search-bing', 'search-ddg']) {
+    const c = st.data.checks.find((x) => x.id === id);
+    assert.ok(c, `self-test check ${id} missing`);
+    assert.equal(c.ok, true, `${id}: ${c.detail}`);
+  }
+  // Career sites are the real internet, unreachable here; each still reports a result.
+  assert.ok(st.data.checks.some((c) => c.id === 'ats-greenhouse') && st.data.checks.some((c) => c.id === 'browser'));
   assert.equal((await call('PUT', '/api/settings', { values: { search_provider: 'serper', search_api_key: 'serper-e2e' } })).status, 200);
   const on = await call('POST', '/api/discover/search', { roles: ['Talent Acquisition'], locations: ['bengaluru', 'remote'], window: 'd', people: true });
   assert.equal(on.status, 200, JSON.stringify(on.data));

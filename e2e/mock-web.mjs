@@ -1,4 +1,4 @@
-// Stand-ins for the outside web during end-to-end tests: the Serper search API,
+// Stand-ins for the outside web during end-to-end tests: Bing RSS, DuckDuckGo Lite, the Serper search API,
 // the Greenhouse and Lever job APIs, and two ordinary job pages (one that may be
 // framed, one that refuses). The app reaches them through SEARCH_API_BASE and
 // ATS_API_BASE, with ALLOW_PRIVATE_FETCH=1 so localhost is allowed.
@@ -20,6 +20,24 @@ function send(res, status, body, headers = {}) {
   res.end(isJson ? JSON.stringify(body) : body);
 }
 
+function esc(t) {
+  return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function results(q) {
+  const organic = [];
+  if (/greenhouse/.test(q)) {
+    organic.push({ title: 'Job Application for Senior Talent Acquisition Partner at Acme Cloud', link: 'https://job-boards.greenhouse.io/acmecloud/jobs/555', snippet: 'Bengaluru · Hybrid · 6+ years of tech hiring', date: '5 hours ago' });
+  }
+  if (/lever/.test(q)) {
+    organic.push({ title: 'Acme Pay - Talent Acquisition Specialist', link: `https://jobs.lever.co/acmepay/${LEVER_ID}`, snippet: 'Remote, India', date: '2 hours ago' });
+  }
+  if (/linkedin\.com\/in/.test(q)) {
+    organic.push({ title: 'Meera Iyer - Head of Talent Acquisition - Acme Cloud | LinkedIn', link: 'https://in.linkedin.com/in/meera-iyer', snippet: 'Bengaluru · Head of Talent Acquisition at Acme Cloud GCC' });
+  }
+  return organic.map((r) => ({ ...r }));
+}
+
 http.createServer((req, res) => {
   let raw = '';
   req.on('data', (c) => { raw += c; });
@@ -30,18 +48,21 @@ http.createServer((req, res) => {
     if (p === '/search' && req.method === 'POST') {
       if (req.headers['x-api-key'] !== 'serper-e2e') return send(res, 401, { message: 'Unauthorized' });
       const body = JSON.parse(raw || '{}');
-      searches.push(body);
-      const organic = [];
-      if (/greenhouse/.test(body.q)) {
-        organic.push({ title: 'Job Application for Senior Talent Acquisition Partner at Acme Cloud', link: 'https://job-boards.greenhouse.io/acmecloud/jobs/555', snippet: 'Bengaluru · Hybrid · 6+ years of tech hiring', date: '5 hours ago' });
-      }
-      if (/lever/.test(body.q)) {
-        organic.push({ title: 'Acme Pay - Talent Acquisition Specialist', link: `https://jobs.lever.co/acmepay/${LEVER_ID}`, snippet: 'Remote, India', date: '2 hours ago' });
-      }
-      if (/linkedin\.com\/in/.test(body.q)) {
-        organic.push({ title: 'Meera Iyer - Head of Talent Acquisition - Acme Cloud | LinkedIn', link: 'https://in.linkedin.com/in/meera-iyer', snippet: 'Bengaluru · Head of Talent Acquisition at Acme Cloud GCC' });
-      }
-      return send(res, 200, { organic });
+      searches.push({ ...body, engine: 'serper' });
+      return send(res, 200, { organic: results(body.q) });
+    }
+    // Free search: Bing's RSS results, and DuckDuckGo Lite as the fallback.
+    if (p === '/search' && url.searchParams.get('format') === 'rss') {
+      const q = url.searchParams.get('q') || '';
+      searches.push({ q, engine: 'bing', filters: url.searchParams.get('filters') });
+      const items = /bing-down/.test(q) ? [] : results(q);
+      return send(res, 200, `<?xml version="1.0"?><rss><channel>${items.map((r) => `<item><title>${esc(r.title)}</title><link>${esc(r.link)}</link><description>${esc(r.snippet)}</description></item>`).join('')}</channel></rss>`, { 'content-type': 'application/rss+xml' });
+    }
+    if (p === '/lite/') {
+      const q = url.searchParams.get('q') || '';
+      searches.push({ q, engine: 'ddg' });
+      const rows = results(q.replace('bing-down', '')).map((r) => `<tr><td><a rel="nofollow" href="//duckduckgo.com/l/?uddg=${encodeURIComponent(r.link)}&amp;rut=x" class='result-link'>${esc(r.title)}</a></td></tr><tr><td class='result-snippet'>${esc(r.snippet)}</td></tr>`);
+      return send(res, 200, `<html><body><table>${rows.join('')}</table></body></html>`);
     }
 
     // Greenhouse job API

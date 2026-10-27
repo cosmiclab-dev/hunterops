@@ -10,14 +10,23 @@ export async function regrill(where: Prisma.JobWhereInput = { status: { not: 'DI
   if (!profile || profileIsEmpty(profile)) throw new HttpError(400, 'Set up your profile first: upload your CV on the Home page.');
   const gp = toGrillProfile(profile);
   const jobs = await prisma.job.findMany({ where, select: { id: true, title: true, location: true, description: true, workMode: true, salary: true } });
-  const now = new Date();
   const results = jobs.map((j) => ({ id: j.id, g: grill(gp, j) }));
-  // Batches of updates in one transaction each keep round trips low on Neon.
-  for (let i = 0; i < results.length; i += 50) {
-    await prisma.$transaction(results.slice(i, i + 50).map(({ id, g }) => prisma.job.update({
-      where: { id },
-      data: { grillScore: g.score, grillBreakdown: g as unknown as Prisma.InputJsonValue, grilledAt: now },
-    })));
+  // One UPDATE per 500 jobs, so a save with a big board still answers in a second or two.
+  for (let i = 0; i < results.length; i += 500) {
+    const rows = results.slice(i, i + 500).map(({ id, g }) => ({ id, score: g.score, breakdown: g }));
+    await prisma.$executeRaw`
+      UPDATE jobs AS j SET grill_score = x.score, grill_breakdown = x.breakdown, grilled_at = now()
+      FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS x(id uuid, score int, breakdown jsonb)
+      WHERE j.id = x.id`;
   }
   return results;
+}
+
+// Regrill that never fails the request it rides on (the save itself already succeeded).
+export async function regrillQuietly(): Promise<{ grilled: number; warning: string | null }> {
+  try {
+    return { grilled: (await regrill()).length, warning: null };
+  } catch (err) {
+    return { grilled: 0, warning: err instanceof HttpError ? err.message : 'Saved, but jobs could not be re-scored. Press Re-grill on any job to retry.' };
+  }
 }

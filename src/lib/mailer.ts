@@ -14,15 +14,7 @@ export async function sendApproved(settings: Settings, email: { id: string; toEm
   const sentToday = await prisma.email.count({ where: { status: 'SENT', sentAt: { gte: since } } });
   if (sentToday >= cap) throw new HttpError(429, `Daily cap reached (${cap} emails in 24 hours). Change it in Settings.`);
 
-  // SMTP_HOST/SMTP_PORT exist for local testing against a mail sink; production uses Gmail.
-  const port = Number(process.env.SMTP_PORT || 465);
-  const transport = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port,
-    secure: port === 465,
-    auth: { user, pass: pass.replace(/\s+/g, '') },
-    ...(process.env.SMTP_HOST ? { tls: { rejectUnauthorized: false } } : {}),
-  });
+  const transport = gmailTransport(user, pass);
   const name = settings.get('sender_name');
   const info = await transport.sendMail({
     from: name ? `"${name.replace(/"/g, '')}" <${user}>` : user,
@@ -31,6 +23,18 @@ export async function sendApproved(settings: Settings, email: { id: string; toEm
     text: email.body,
   });
   return info.messageId as string;
+}
+
+// SMTP_HOST/SMTP_PORT exist for local testing against a mail sink; production uses Gmail.
+export function gmailTransport(user: string, pass: string) {
+  const port = Number(process.env.SMTP_PORT || 465);
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port,
+    secure: port === 465,
+    auth: { user, pass: pass.replace(/\s+/g, '') },
+    ...(process.env.SMTP_HOST ? { tls: { rejectUnauthorized: false } } : {}),
+  });
 }
 
 export const EMAIL_RE = /^[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[a-z]{2,}$/i;

@@ -5,6 +5,7 @@ import { loadSettings, publicSettings } from '@/lib/settings';
 import { seedCompanies } from '@/lib/scan/scanner';
 import { SettingsForm } from '@/components/settings-form';
 import { LogoutButton } from '@/components/logout-button';
+import { SelfTest } from '@/components/self-test';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +21,7 @@ export default async function SettingsPage() {
         <div><p className="label-caps text-primary">Control room</p><h1 className="page-title mt-1">Settings</h1></div>
         {process.env.APP_PASSWORD && <LogoutButton />}
       </div>
+      <SelfTest />
       <SettingsForm
         initial={publicSettings(settings)}
         providers={PROVIDERS}
