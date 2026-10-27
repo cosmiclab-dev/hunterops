@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Send } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -29,23 +29,30 @@ export default async function JobPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link href="/" className="label-caps inline-flex items-center gap-1 opacity-70"><ArrowLeft className="h-3 w-3" /> Board</Link>
-      <header className="flex items-start gap-4">
-        <GrillScoreBadge score={job.grillScore} size="lg" />
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold leading-8 tracking-tight">{job.title}</h1>
-          <p className="text-base leading-6">{job.company}</p>
-          <p className="meta mt-1">{[job.location, job.workMode !== 'UNKNOWN' ? job.workMode.toLowerCase() : null, job.salary, job.source, timeAgo(job.postedAt || job.firstSeenAt)].filter(Boolean).join(' · ')}</p>
+      <Link href="/jobs" className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Jobs</Link>
+      <header className="surface hero-glow flex flex-col gap-4 p-4 md:p-6">
+        <div className="flex items-start gap-4">
+          <GrillScoreBadge score={job.grillScore} size="lg" />
+          <div className="min-w-0">
+            <h1 className="text-2xl font-extrabold leading-8 tracking-tight">{job.title}</h1>
+            <p className="text-base font-medium leading-6">{job.company}</p>
+            <p className="meta mt-1">{[job.location, job.workMode !== 'UNKNOWN' ? job.workMode.toLowerCase() : null, job.salary, job.source, timeAgo(job.postedAt || job.firstSeenAt)].filter(Boolean).join(' · ')}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <a href={job.url} target="_blank" rel="noopener noreferrer"><ExternalLink /> Open the posting to apply</a>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={`/outreach?jobId=${job.id}`}><Send /> Write outreach</Link>
+          </Button>
         </div>
       </header>
-      <Button asChild className="self-start">
-        <a href={job.url} target="_blank" rel="noopener noreferrer"><ExternalLink /> Open the posting to apply</a>
-      </Button>
 
       <JobStatus id={job.id} status={job.status} notes={job.notes} />
 
       <Tabs defaultValue="grill">
-        <div className="-mx-4 overflow-x-auto px-4">
+        <div className="scroll-x">
           <TabsList>
             <TabsTrigger value="grill">Grill</TabsTrigger>
             <TabsTrigger value="resume">Resume</TabsTrigger>
@@ -72,7 +79,7 @@ export default async function JobPage({ params }: { params: { id: string } }) {
           />
         </TabsContent>
         <TabsContent value="jd">
-          <div className="whitespace-pre-wrap text-sm leading-5">{job.description || 'No description was captured for this posting.'}</div>
+          <div className="surface whitespace-pre-wrap p-4 text-sm leading-6">{job.description || 'No description was captured for this posting.'}</div>
         </TabsContent>
         <TabsContent value="check">
           <SlopChecker />

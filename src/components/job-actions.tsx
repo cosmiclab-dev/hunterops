@@ -39,22 +39,23 @@ export function JobStatus({ id, status, notes }: { id: string; status: string; n
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="-mx-4 overflow-x-auto px-4">
-        <div className="inline-flex gap-1">
+    <div className="surface flex flex-col gap-3 p-4">
+      <div className="scroll-x">
+        <div className="inline-flex gap-1.5">
           {STATUSES.map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => save({ status: s })}
-              className={cn('h-8 whitespace-nowrap rounded-sm border px-2 font-mono text-xs uppercase tracking-wider', s === cur ? 'bg-primary text-primary-foreground' : '')}
+              className="chip capitalize"
+              data-on={s === cur}
             >
               {s.toLowerCase()}
             </button>
           ))}
         </div>
       </div>
-      <p className="meta">You apply on the company site yourself, then mark it Applied here.</p>
+      <p className="text-xs text-muted-foreground">You apply on the company site yourself, then mark it Applied here.</p>
       <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="Notes: referral, recruiter name, follow-up date" aria-label="Notes" />
       <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" onClick={() => save({ notes: text })}>Save notes</Button>

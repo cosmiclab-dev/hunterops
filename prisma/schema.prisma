@@ -105,6 +105,7 @@ model Job {
   resumes        Resume[]
   emails         Email[]
   contacts       Contact[]
+  outreach       Outreach[]
 
   @@index([status, firstSeenAt(sort: Desc)])
   @@index([grillScore(sort: Desc)])
@@ -165,6 +166,28 @@ model Email {
 
   @@index([createdAt(sort: Desc)])
   @@map("emails")
+}
+
+// LinkedIn DMs, referral asks and other messages the person sends by hand.
+// HunterOps writes and logs them; the person copies and sends each one.
+model Outreach {
+  id            String    @id @default(uuid()) @db.Uuid
+  jobId         String?   @map("job_id") @db.Uuid
+  job           Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  company       String
+  recipientName String?   @map("recipient_name")
+  recipientRole String    @map("recipient_role")
+  channel       String    @default("linkedin_dm") // linkedin_dm, email, referral, other
+  kind          String    @default("custom")      // head_of_ta, peer_referral, practice_head, gap_email, gap_phone, custom
+  message       String
+  status        String    @default("drafted")     // drafted, sent, replied
+  sentAt        DateTime? @map("sent_at")
+  followUpAt    DateTime? @map("follow_up_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([createdAt(sort: Desc)])
+  @@index([status, followUpAt])
+  @@map("outreach_logs")
 }
 
 model ScanRun {

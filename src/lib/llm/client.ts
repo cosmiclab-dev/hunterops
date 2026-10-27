@@ -72,9 +72,14 @@ export function gatewayHeaders(cfg: LlmConfig, session?: string): Record<string,
   return { 'x-opencode-session': session || crypto.randomUUID() };
 }
 
+// Thinking models (DeepSeek V4, Kimi, GLM...) spend output tokens on reasoning
+// before the answer, so a small cap returns an empty reply. Only used tokens are billed.
+export const MIN_OUTPUT_TOKENS = 4096;
+const MAX_OUTPUT_TOKENS = 16_000;
+
 function buildRequest(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions): { headers: Record<string, string>; body: unknown } {
   const extra = gatewayHeaders(cfg, opts.session);
-  const maxTokens = opts.maxTokens ?? 2000;
+  const maxTokens = Math.min(MAX_OUTPUT_TOKENS, Math.max(opts.maxTokens ?? 2000, MIN_OUTPUT_TOKENS));
   if (cfg.format === 'anthropic') {
     const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
     const rest = messages.filter((m) => m.role !== 'system');
@@ -150,7 +155,14 @@ export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOp
     throw new HttpError(502, 'The AI provider returned a non-JSON response.');
   }
   const content = readContent(cfg, data);
-  if (typeof content !== 'string' || !content.trim()) throw new HttpError(502, 'The model returned an empty answer. Try again.');
+  if (typeof content !== 'string' || !content.trim()) {
+    const cut = data?.choices?.[0]?.finish_reason === 'length' || data?.stop_reason === 'max_tokens';
+    const budget = Math.max(opts.maxTokens ?? 2000, MIN_OUTPUT_TOKENS);
+    if (cut && budget < MAX_OUTPUT_TOKENS) return chat(cfg, messages, { ...opts, maxTokens: budget * 3 });
+    throw new HttpError(502, cut
+      ? `"${cfg.model}" used its whole answer budget thinking. Try again, or pick a faster model in Settings.`
+      : 'The model returned an empty answer. Try again.');
+  }
   return { content, model: data?.model || cfg.model, usage: data?.usage ?? null };
 }
 

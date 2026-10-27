@@ -22,7 +22,7 @@ const FRAMEWORKS = { plain: 'Plain', aida: 'AIDA', pas: 'PAS' };
 
 function Select({ value, onChange, options, id }: { value: string; onChange: (v: string) => void; options: Record<string, string>; id: string }) {
   return (
-    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border bg-background px-3">
+    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-full rounded-lg border bg-card px-3">
       {Object.entries(options).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
     </select>
   );
@@ -77,7 +77,7 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border p-4" data-testid="email-draft">
+    <div className="surface flex flex-col gap-3 p-4" data-testid="email-draft">
       <div className="flex items-center justify-between gap-2">
         <span className="meta">{KINDS[email.kind as keyof typeof KINDS] ?? email.kind} · {FRAMEWORKS[email.framework as keyof typeof FRAMEWORKS] ?? email.framework}</span>
         <Badge variant={sent ? 'default' : 'outline'}>{email.status.toLowerCase()}</Badge>
@@ -108,7 +108,7 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
                     <DialogTitle>Send this email?</DialogTitle>
                     <DialogDescription>It goes out from your Gmail exactly as shown. Nothing is sent until you press Approve and send.</DialogDescription>
                   </DialogHeader>
-                  <div className="flex flex-col gap-2 rounded-md border p-3">
+                  <div className="flex flex-col gap-2 rounded-xl border bg-muted/40 p-3">
                     <p className="meta">To {email.toEmail}</p>
                     <p className="font-semibold">{email.subject}</p>
                     <p className="whitespace-pre-wrap text-sm leading-5">{email.body}</p>

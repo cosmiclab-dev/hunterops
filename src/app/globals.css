@@ -1,39 +1,77 @@
 @import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
 @import '@fontsource/inter/600.css';
 @import '@fontsource/inter/700.css';
+@import '@fontsource/inter/800.css';
 @import '@fontsource/roboto-mono/400.css';
+@import '@fontsource/roboto-mono/500.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* shadcn/ui tokens mapped onto the three DESIGN.md colours:
-   #111111 text, #FFFFFF background, #E5E5E5 borders. */
+/* Two themes on one set of tokens. Light keeps DESIGN.md's Swiss base
+   (#111111 ink, white cards, #E5E5E5 rules); dark is the operational
+   "command center" look. The <html> element gets .dark from the theme
+   script in layout.tsx (system setting by default, or the Settings toggle). */
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 240 9% 97%;
     --foreground: 0 0% 6.7%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 6.7%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 6.7%;
-    --primary: 0 0% 6.7%;
+    --primary: 248 82% 58%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 100%;
+    --secondary: 240 6% 94%;
     --secondary-foreground: 0 0% 6.7%;
-    --muted: 0 0% 100%;
-    --muted-foreground: 0 0% 6.7%;
-    --accent: 0 0% 89.8%;
+    --muted: 240 6% 94%;
+    --muted-foreground: 240 4% 40%;
+    --accent: 240 6% 93%;
     --accent-foreground: 0 0% 6.7%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
+    --success: 142 72% 36%;
+    --warning: 38 92% 44%;
+    --info: 199 89% 42%;
     --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 6.7%;
-    --radius: 4px;
+    --input: 0 0% 86%;
+    --ring: 248 82% 58%;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgb(17 17 17 / 0.04), 0 4px 16px -4px rgb(17 17 17 / 0.08);
+    --glow: 248 82% 58%;
+    color-scheme: light;
+  }
+  .dark {
+    --background: 228 24% 5%;
+    --foreground: 220 20% 94%;
+    --card: 228 20% 8.5%;
+    --card-foreground: 220 20% 94%;
+    --popover: 228 20% 9%;
+    --popover-foreground: 220 20% 94%;
+    --primary: 250 100% 72%;
+    --primary-foreground: 228 24% 6%;
+    --secondary: 228 16% 13%;
+    --secondary-foreground: 220 20% 94%;
+    --muted: 228 16% 12%;
+    --muted-foreground: 225 10% 62%;
+    --accent: 228 16% 14%;
+    --accent-foreground: 220 20% 94%;
+    --destructive: 0 84% 62%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 69% 52%;
+    --warning: 43 96% 58%;
+    --info: 199 92% 62%;
+    --border: 228 14% 16%;
+    --input: 228 14% 20%;
+    --ring: 250 100% 72%;
+    --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 24px -8px rgb(0 0 0 / 0.6);
+    --glow: 250 100% 72%;
+    color-scheme: dark;
   }
   * { @apply border-border; }
-  html { -webkit-text-size-adjust: 100%; }
+  html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: 'cv11', 'ss01';
@@ -44,6 +82,20 @@
 }
 
 @layer components {
-  .meta { @apply font-mono text-xs leading-4; }
-  .label-caps { @apply font-mono text-xs uppercase tracking-wider leading-4; }
+  .meta { @apply font-mono text-xs leading-4 text-muted-foreground; }
+  .label-caps { @apply font-mono text-[11px] font-medium uppercase tracking-[0.08em] leading-4; }
+  .surface { @apply rounded-xl border bg-card text-card-foreground; box-shadow: var(--shadow); }
+  .page-title { @apply text-[28px] font-extrabold leading-9 tracking-tight; }
+  .section-title { @apply label-caps text-muted-foreground; }
+  .chip {
+    @apply inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3 text-xs font-medium transition-colors;
+  }
+  .chip[data-on='true'] { @apply border-primary bg-primary text-primary-foreground; }
+  .hero-glow {
+    background:
+      radial-gradient(120% 80% at 0% 0%, hsl(var(--glow) / 0.22), transparent 60%),
+      radial-gradient(90% 70% at 100% 0%, hsl(var(--info) / 0.14), transparent 60%);
+  }
+  .scroll-x { @apply -mx-4 overflow-x-auto px-4; scrollbar-width: none; }
+  .scroll-x::-webkit-scrollbar { display: none; }
 }

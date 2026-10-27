@@ -38,6 +38,36 @@ function answer(system, messages) {
       ? { subject: 'Senior TA Partner role at Acme', body: 'Hi Asha,\n\nI saw the Senior TA Partner opening. I closed 120 tech roles in 12 months at Capgemini.\n\nCould we talk for 10 minutes this week?\n\nDivya' }
       : { subject: 'Senior TA Partner role at Acme', body: 'Hi Asha,\n\nI would love to delve into the Senior TA Partner opening. I closed 120 tech roles in 12 months at Capgemini.\n\nCould we talk for 10 minutes this week?\n\nDivya' });
   }
+  if (/auditing a Senior Recruiter's CV/.test(system)) {
+    return JSON.stringify({
+      critique: [
+        { original: 'Responsible for end-to-end recruitment for IT roles.', why_rejected: 'Duty language with no volume, channel or outcome.', verdict: 'Rewrite', rewrite: 'Closed [N] cloud and data requisitions a quarter for India delivery units, 70% through direct sourcing, at [X] days time to fill.' },
+        { original: 'Handled stakeholder meetings and candidate screening.', why_rejected: 'Describes meetings, not results.', verdict: 'Rewrite', rewrite: 'Ran weekly hiring reviews with 6 delivery directors, cutting interview-to-offer time from [X] to [Y] days.' },
+      ],
+      rewrites: [
+        { focus: 'Direct-sourcing efficiency and vendor spend', bullet: 'Moved 70% of hires to direct sourcing with Boolean and GitHub mapping, cutting agency spend by ₹40 lakh a year.' },
+        { focus: 'Volume, pipeline velocity and Time-to-Fill', bullet: 'Closed 120 tech roles in 12 months at a 38-day average time to fill.' },
+        { focus: 'Niche or high-attrition pipelining and Offer-to-Join', bullet: 'Kept a 300-profile niche cloud pipeline warm, lifting Offer-to-Join to [Y]%.' },
+        { focus: 'Business partner and delivery-director stakeholder management', bullet: 'Partnered with Practice Heads to forecast quarterly demand across 4 service lines.' },
+        { focus: 'Sourcing tools, talent mapping and pipeline governance', bullet: 'Built weekly funnel dashboards in Excel for 6 hiring managers, flagging stalled reqs within 48 hours.' },
+      ],
+      summary: 'Senior Recruiter with 7 years of full-cycle tech hiring at Capgemini scale. Deep direct-sourcing depth in cloud and data talent for GCCs. Available to join immediately with a 0-day notice period for Q4 and Q1 backlogs.',
+      weak_phrases: ['Responsible for', 'Handled'],
+    });
+  }
+  if (/short LinkedIn messages for a Senior Recruiter/.test(system)) {
+    return JSON.stringify({
+      head_of_ta: 'Hi Asha, saw the Senior TA Partner opening at Acme. At Capgemini I closed 120 tech roles in 12 months at 38 days time to fill. I can join on day one with no notice period. Open to a 10-minute call this week? Divya',
+      peer_referral: 'Hi Ravi, hope Acme is treating you well. I saw the Senior TA Partner req. I closed 120 tech roles at Capgemini and can start immediately. Would you be comfortable referring me? Happy to send a 3-line blurb. Divya',
+      practice_head: 'Hi Meera, your cloud practice looks busy with new reqs. I ran direct sourcing for Capgemini delivery teams, 70% without agencies. I can start Monday with zero notice. Worth a quick call about your hiring backlog? Divya',
+    });
+  }
+  if (/explaining a career gap/.test(system)) {
+    return JSON.stringify({
+      email: 'Since November 2025 I have taken a planned break after five years of high-volume hiring at Capgemini. I used the time to get hands-on with AI-assisted sourcing and market mapping. I can join immediately with no notice period.',
+      phone: 'After Capgemini I took a planned break from November 2025. I spent it learning AI sourcing tools and mapping the Bengaluru GCC market. The upside for you is that I can start right away. Most candidates you speak to will be on 60 to 90 days notice.',
+    });
+  }
   return '{}';
 }
 
