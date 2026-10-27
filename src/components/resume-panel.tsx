@@ -36,7 +36,7 @@ export function ResumePanel({ jobId, saved }: { jobId: string; saved: Saved[] })
     <div className="flex flex-col gap-4">
       <div className="flex gap-3">
         {(['standard', 'compact'] as const).map((d) => (
-          <button key={d} type="button" onClick={() => setDensity(d)} className={`label-caps ${d === density ? 'underline underline-offset-4' : 'opacity-60'}`}>{d}</button>
+          <button key={d} type="button" onClick={() => setDensity(d)} className="chip capitalize" data-on={d === density}>{d}</button>
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -49,7 +49,7 @@ export function ResumePanel({ jobId, saved }: { jobId: string; saved: Saved[] })
       {err && <p className="text-sm text-destructive" role="alert">{err}</p>}
 
       {result && (
-        <div className="flex flex-col gap-3 rounded-lg border p-4" data-testid="tailor-result">
+        <div className="surface flex flex-col gap-3 p-4" data-testid="tailor-result">
           <p className="font-semibold">{result.resume.name}</p>
           <p className="meta">{result.pages} page{result.pages > 1 ? 's' : ''} · {result.model}</p>
           <SlopReportView report={result.slop} />

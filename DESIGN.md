@@ -43,7 +43,7 @@ If you change a value, change it in `designer.ts` and here, in the same commit.
 | `border` | `#E5E5E5` | Hairlines, card borders, dividers (0.5pt in print, 1px on screen) |
 
 - Three colours. Secondary text is the same `#111111`; it reads as secondary because it is set in Roboto Mono at 8pt, not because it is grey.
-- **One functional exception:** the Grill Score badge on the dashboard uses red (below 50), yellow (50 to 74) and green (75 and up). Status colours never appear in documents.
+- **One functional exception in documents' sense:** the app (see App themes) adds an accent; the Grill Score badge uses red (below 50), yellow (50 to 74) and green (75 and up). Status colours never appear in documents.
 
 ## Layout
 
@@ -53,7 +53,17 @@ If you change a value, change it in `designer.ts` and here, in the same commit.
 - **Experience entries:** role title (Inter 600) on the left, dates (mono) on the right of the same line; company and location (mono) on the next line; then bullets.
 - **Bullets:** at most 6 per role, at most 2 lines each. Start with a verb. Real numbers only.
 - **Length:** one page under 8 years of experience, two pages otherwise.
-- **Dashboard:** single column, max width 768px, centred on large screens with wide side margins; 16px side gutter on phones. Cards are white with a 1px `#E5E5E5` border, no shadow, 4px radius.
+- **App screens:** see "App themes" below. Documents (resumes) never change with the app theme.
+
+## App themes
+
+The resume rules above are strict Switzerland Style. The app itself uses the same type (Inter, Roboto Mono) and 4px grid, with two themes on one set of CSS tokens in `src/app/globals.css`:
+
+- **Light:** `#111111` text and white cards on a very light grey page, `#E5E5E5` borders.
+- **Dark ("command center"):** near-black page (`hsl(228 24% 5%)`), slightly raised cards, soft light text.
+- **Accent:** one violet accent for actions and the active tab, plus status colours (success, warning, info) for pipeline stages and reminders. The Grill Score bands stay red, yellow and green in both themes.
+- **Auto** follows the phone's light or dark mode; Settings and the header button can force Light or Dark. The choice is stored in the browser.
+- Cards: 16px radius, 1px border, soft shadow. Buttons and chips are pills. Single column on phones with a five-tab bottom bar; wider grids from 768px.
 
 ## Density variants
 

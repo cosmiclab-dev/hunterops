@@ -99,3 +99,99 @@ ${JSON_ONLY} Shape: { "subject": "...", "body": "..." }`;
   ].filter(Boolean);
   return [{ role: 'system', content: system }, { role: 'user', content: lines.join('\n\n') }];
 }
+
+// Profile roaster: the "duty vs metric" audit a TA Director would run on a recruiter CV.
+export const ROAST_FOCUSES = [
+  'Direct-sourcing efficiency and vendor spend',
+  'Volume, pipeline velocity and Time-to-Fill',
+  'Niche or high-attrition pipelining and Offer-to-Join',
+  'Business partner and delivery-director stakeholder management',
+  'Sourcing tools, talent mapping and pipeline governance',
+] as const;
+
+export function roastMessages(a: { bullets: string; domain?: string; target?: string; profileText?: string }): ChatMessage[] {
+  const system = `You are a VP of Talent Acquisition at a top product company or Global Capability Center auditing a Senior Recruiter's CV. Be direct and specific; no encouragement filler.
+
+Tasks:
+1. For every original bullet: say in one sentence why an HR Director would pass on it (passive duty language such as "responsible for", "handled", "worked on", "supported"; no volume, no channel mix, no outcome), then give a short verdict (Keep, Rewrite, or Cut) and a rewritten bullet using: Action verb + domain complexity and requisition volume + sourcing channel or method + business outcome (Time-to-Fill, cost-per-hire, Offer-to-Join, vendor dependency, escalations).
+2. Write 5 new bullets, one for each focus: ${ROAST_FOCUSES.map((f, i) => `(${i + 1}) ${f}`).join('; ')}.
+3. Write a 3-sentence summary for the top of the CV: senior full-cycle ownership at enterprise scale; sourcing depth in the stated domain; immediate availability (0-day notice) for Q4/Q1 requisition backlogs.
+4. List the weak phrases you found, exactly as written.
+
+Rules:
+- ${NO_FABRICATION}
+- Each bullet at most 30 words.
+- ${antiSlopInstruction()}
+
+${JSON_ONLY} Shape:
+{
+  "critique": [ { "original": "", "why_rejected": "", "verdict": "Keep|Rewrite|Cut", "rewrite": "" } ],
+  "rewrites": [ { "focus": "", "bullet": "" } ],
+  "summary": "",
+  "weak_phrases": ["..."]
+}`;
+  const user = [
+    a.domain ? `Hiring domain: ${a.domain}` : null,
+    a.target ? `Target employers: ${a.target}` : null,
+    `Bullets to audit:\n"""\n${a.bullets}\n"""`,
+    a.profileText ? `Rest of the profile, for facts only:\n"""\n${a.profileText.slice(0, 6000)}\n"""` : null,
+  ].filter(Boolean).join('\n\n');
+  return [{ role: 'system', content: system }, { role: 'user', content: user }];
+}
+
+// Outreach machine: three sub-60-word messages for LinkedIn DM, referral or email.
+export const OUTREACH_KINDS = {
+  head_of_ta: { label: 'Head of TA', who: 'a Head of Talent Acquisition or VP HR who owns the open role' },
+  peer_referral: { label: 'Peer referral', who: 'an ex-colleague or peer Senior Recruiter at the company, asking for an internal referral' },
+  practice_head: { label: 'Practice Head', who: 'a Managing Director or Practice Head whose team is short on hiring bandwidth' },
+} as const;
+export type OutreachKind = keyof typeof OUTREACH_KINDS;
+
+export function outreachMessages(a: {
+  company: string; role?: string; req?: string; recipientName?: string; recipientTitle?: string; profileText: string;
+}): ChatMessage[] {
+  const first = a.recipientName ? a.recipientName.split(' ')[0] : '[Name]';
+  const system = `You write short LinkedIn messages for a Senior Recruiter (ex-Capgemini) looking for a TA role. Write three messages, one per recipient:
+${Object.entries(OUTREACH_KINDS).map(([k, v]) => `- ${k}: to ${v.who}.`).join('\n')}
+
+Each message follows this order: a specific observation or the req itself, one line of enterprise-scale proof from the profile, the immediate 0-day joining advantage, then one low-friction ask (a 10-minute call, a referral, or the right person to speak to).
+
+Rules:
+- Under 60 words each. Count them.
+- Open with "Hi ${first}," and sign off with the candidate's first name.
+- No "I hope this finds you well", no "I am writing to", no emojis, no hashtags.
+- ${NO_FABRICATION}
+- ${antiSlopInstruction()}
+
+${JSON_ONLY} Shape: { "head_of_ta": "", "peer_referral": "", "practice_head": "" }`;
+  const user = [
+    `Company: ${a.company}`,
+    a.role ? `Role: ${a.role}` : null,
+    a.recipientName || a.recipientTitle ? `Recipient: ${[a.recipientName, a.recipientTitle].filter(Boolean).join(', ')}` : null,
+    a.req ? `Req details or link:\n"""\n${a.req.slice(0, 3000)}\n"""` : null,
+    `Candidate profile:\n"""\n${a.profileText.slice(0, 6000)}\n"""`,
+  ].filter(Boolean).join('\n\n');
+  return [{ role: 'system', content: system }, { role: 'user', content: user }];
+}
+
+// Career gap scripts: one for a screening email, one to say on a phone screen.
+export function gapMessages(a: { gapSince: string; reason?: string; profileText: string }): ChatMessage[] {
+  const system = `You coach a Senior Recruiter (ex-Capgemini) through explaining a career gap. Write two scripts:
+- "email": 3-4 sentences for a screening email.
+- "phone": 4-6 conversational sentences to say on a recruiter phone screen.
+
+Both: state the gap plainly without apologising; frame the time as a deliberate reset plus upskilling (use the reason given, or AI-assisted sourcing and market mapping if none); end on the advantage of joining immediately with a 0-day notice period, compared with candidates on 60 to 90 day notice.
+
+Rules:
+- ${NO_FABRICATION}
+- First person, plain spoken English.
+- ${antiSlopInstruction()}
+
+${JSON_ONLY} Shape: { "email": "", "phone": "" }`;
+  const user = [
+    `Out of work since: ${a.gapSince}`,
+    a.reason ? `What the time was used for: ${a.reason}` : null,
+    `Candidate profile:\n"""\n${a.profileText.slice(0, 5000)}\n"""`,
+  ].filter(Boolean).join('\n\n');
+  return [{ role: 'system', content: system }, { role: 'user', content: user }];
+}

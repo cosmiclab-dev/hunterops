@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ThemeSwitch } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,8 +22,8 @@ const LOCATION_OPTIONS = {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-4 border-t pt-6">
-      <h2 className="text-lg font-semibold">{title}</h2>
+    <section className="surface flex flex-col gap-4 p-4 md:p-5">
+      <h2 className="text-base font-bold">{title}</h2>
       {children}
     </section>
   );
@@ -156,18 +157,23 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-5">
       {!appSecret && (
-        <p className="rounded-lg border border-destructive p-4 text-sm leading-5">
+        <p className="rounded-xl border border-destructive bg-destructive/5 p-4 text-sm leading-5">
           APP_SECRET is not set (or shorter than 32 characters), so API keys cannot be saved here. Add it in Vercel environment variables, or set the provider key as an environment variable instead.
         </p>
       )}
+
+      <Section title="Appearance">
+        <p className="text-sm leading-5 text-muted-foreground">Auto follows your iPhone&apos;s light or dark mode.</p>
+        <ThemeSwitch />
+      </Section>
 
       <Section title="AI model">
         <p className="text-sm leading-5">Default: OpenCode Go with DeepSeek. Any provider below works the same way: pick it, paste a key, pick a model. The custom option takes any OpenAI-compatible API.</p>
         <div className="flex flex-col gap-1">
           <Label htmlFor="provider">Provider</Label>
-          <select id="provider" value={provider} onChange={(e) => { setProvider(e.target.value); setModel(''); setKey(''); }} className="h-10 rounded-md border bg-background px-3">
+          <select id="provider" value={provider} onChange={(e) => { setProvider(e.target.value); setModel(''); setKey(''); }} className="h-11 rounded-lg border bg-card px-3">
             {Object.entries(providers).map(([id, p]) => <option key={id} value={id}>{p.label}</option>)}
           </select>
         </div>
@@ -182,6 +188,11 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
           <Label htmlFor="model">Model</Label>
           <Input id="model" list="models" value={model} onChange={(e) => setModel(e.target.value)} placeholder={def.defaultModel || 'Type the model id'} />
           <datalist id="models">{def.models.map((m) => <option key={m} value={m} />)}</datalist>
+          {def.models.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {def.models.map((m) => <button key={m} type="button" className="chip h-7 font-mono text-[11px]" data-on={(model || def.defaultModel) === m} onClick={() => setModel(m)}>{m}</button>)}
+            </div>
+          )}
           {provider !== 'custom' && <p className="meta">Model list: {def.docs}</p>}
         </div>
         <div className="flex flex-col gap-1">
@@ -214,10 +225,10 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         <div className="flex flex-col gap-1"><Label htmlFor="kw">Role keywords (comma separated)</Label><Textarea id="kw" rows={3} value={feed.keywords} onChange={(e) => setFeed({ ...feed, keywords: e.target.value })} /></div>
         <div className="flex flex-col gap-1"><Label htmlFor="ex">Exclude titles with</Label><Input id="ex" value={feed.exclude} onChange={(e) => setFeed({ ...feed, exclude: e.target.value })} /></div>
         <fieldset className="flex flex-col gap-2">
-          <legend className="label-caps mb-2">Locations</legend>
+          <legend className="label-caps mb-2 text-muted-foreground">Locations</legend>
           {Object.entries(LOCATION_OPTIONS).map(([k, label]) => (
             <label key={k} className="flex items-center gap-3 text-sm">
-              <input type="checkbox" className="h-5 w-5" checked={feed.locations.includes(k)}
+              <input type="checkbox" className="h-5 w-5 accent-[hsl(var(--primary))]" checked={feed.locations.includes(k)}
                 onChange={(e) => setFeed({ ...feed, locations: e.target.checked ? [...feed.locations, k] : feed.locations.filter((x) => x !== k) })} />
               {label}
             </label>

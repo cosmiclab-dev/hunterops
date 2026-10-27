@@ -10,10 +10,14 @@ You always apply on the company's own site yourself. HunterOps never submits app
 
 | Screen | What you do there |
 | --- | --- |
-| **Job Board** (`/`) | New, Saved, Applied and All tabs; Bengaluru / Remote filters; sort by best fit or newest. Every card shows a **Grill Score badge** (red under 50, yellow 50 to 74, green 75+), matched skills, and missing skills with a `?`. *Scan now* pulls fresh postings. |
+| **Home** (`/`) | Countdown to the 31 December offer goal, weekly activity target, stat tiles, jobs found in the last 24 hours, pipeline split, 14-day activity chart, follow-ups due and quick actions. |
+| **Discover** (`/discover`) | X-Ray search launcher: pick role titles, location and window (24h, 48h, week) and get one Google search per ATS (Greenhouse, Ashby, Lever, SmartRecruiters, Workday) with the time filter built in, plus hiring-post and TA-leader finders. Quick add puts any posting on the board and grills it. Nothing is scraped: each link opens a normal search in your browser. |
+| **Pipeline** (`/pipeline`) | Kanban board: Saved, Applied, Interview, Offer, Closed. Drag cards on desktop; use the Move menu on iPhone. |
+| **Outreach** (`/outreach`) | **Write**: three messages under 60 words (Head of TA, peer referral, Practice Head) with word counts and Anti-Slop. **Gap scripts**: a screening-email paragraph and a phone-screen answer for the career gap. **Log**: every message you send by hand, with a follow-up reminder 5 days later, snooze and "got a reply". |
+| **Jobs** (`/jobs`) | New, Saved, Applied and All tabs; Bengaluru / Remote filters; sort by best fit or newest. Every card shows a **Grill Score badge** (red under 50, yellow 50 to 74, green 75+), matched skills, and missing skills with a `?`. *Scan now* pulls fresh postings. |
 | **Job page** (`/jobs/[id]`) | Status tracker and notes. Tabs: **Grill** (the score broken down), **Resume** (tailor to this job, download PDF or DOCX), **Email** (write, edit, review, approve and send), **JD**, **Slop check**. |
-| **Profile** (`/profile`) | Import your resume from PDF, DOCX or TXT; the model fills the form; you check and save. Saving re-scores every job. Also holds your location rules for the Grill. |
-| **Settings** (`/settings`) | AI provider, model and key; Gmail; feed keywords and locations; company boards (add any Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Recruitee or Workable careers URL). |
+| **Profile** (`/profile`) | **CV roaster** tab: paste bullets and get a TA Director's red-line audit (before and after, with a verdict and reason per bullet), five enterprise-metric bullets and a 3-sentence immediate-availability summary. **Profile** tab: import your resume from PDF, DOCX or TXT; the model fills the form; you check and save. Saving re-scores every job. Also holds your location rules for the Grill. |
+| **Settings** (`/settings`) | Theme (Auto follows the phone, or Light or Dark), AI provider, model and key; Gmail; feed keywords and locations; company boards (add any Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Recruitee or Workable careers URL). |
 
 ## The intelligence modules
 
@@ -58,7 +62,7 @@ Scores are stored on each job with the full breakdown, recomputed when you save 
 
 ## Data model
 
-`prisma/schema.prisma`: `Profile` (one row), `Company` (boards to scan), `Job` (feed and tracker in one table, with `grillScore` and `grillBreakdown`), `Resume` (tailored copies, with their Anti-Slop score), `Contact`, `Email` (DRAFT → APPROVED → SENT or FAILED), `ScanRun`, `Setting`. Migrations are in `prisma/migrations` and run on every Vercel build.
+`prisma/schema.prisma`: `Profile` (one row), `Company` (boards to scan), `Job` (feed and tracker in one table, with `grillScore` and `grillBreakdown`), `Resume` (tailored copies, with their Anti-Slop score), `Contact`, `Email` (DRAFT → APPROVED → SENT or FAILED), `Outreach` (LinkedIn DMs and referral asks you send yourself, with follow-up dates), `ScanRun`, `Setting`. Migrations are in `prisma/migrations` and run on every Vercel build.
 
 ## Email safety
 

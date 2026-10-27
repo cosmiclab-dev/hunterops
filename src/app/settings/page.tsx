@@ -17,7 +17,7 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <div><p className="label-caps text-primary">Control room</p><h1 className="page-title mt-1">Settings</h1></div>
         {process.env.APP_PASSWORD && <LogoutButton />}
       </div>
       <SettingsForm

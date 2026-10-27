@@ -80,7 +80,7 @@ await step('settings: OpenCode Go + DeepSeek is the default provider', async () 
 await step('test connection fails cleanly with a bad key', async () => {
   const r = await call('POST', '/api/settings/test', { provider: 'custom', baseUrl: 'http://127.0.0.1:4010/v1', model: 'deepseek-v4.1-flash', key: 'wrong' });
   assert.equal(r.status, 502);
-  assert.match(r.data.error, /rejected the API key/);
+  assert.match(r.data.error, /Check the API key/);
 });
 
 await step('switch to a custom OpenAI-compatible provider (the mock) and test it', async () => {
@@ -152,7 +152,7 @@ await step('scan runs, seeds company boards and reports blocked sources without 
 });
 
 await step('job board renders cards with colour-coded Grill badges, best fit first', async () => {
-  const res = await call('GET', '/?view=all', undefined, { raw: true });
+  const res = await call('GET', '/jobs?view=all', undefined, { raw: true });
   assert.equal(res.status, 200);
   const html = await res.text();
   const order = ['Senior Talent Acquisition Partner', 'Technical Recruiter', 'Recruiter</a>'].map((t) => html.indexOf(t));
@@ -163,9 +163,9 @@ await step('job board renders cards with colour-coded Grill badges, best fit fir
 });
 
 await step('filters: Bengaluru and Remote views', async () => {
-  const blr = await (await call('GET', '/?view=all&loc=bengaluru', undefined, { raw: true })).text();
+  const blr = await (await call('GET', '/jobs?view=all&loc=bengaluru', undefined, { raw: true })).text();
   assert.ok(blr.includes('Senior Talent Acquisition Partner') && !blr.includes('Technical Recruiter'));
-  const remote = await (await call('GET', '/?view=all&loc=remote', undefined, { raw: true })).text();
+  const remote = await (await call('GET', '/jobs?view=all&loc=remote', undefined, { raw: true })).text();
   assert.ok(remote.includes('Technical Recruiter') && !remote.includes('Senior Talent Acquisition Partner'));
 });
 
@@ -278,6 +278,54 @@ await step('company boards: add from a careers URL and pause', async () => {
   const p = await call('PATCH', `/api/companies/${r.data.company.id}`, { active: false });
   assert.equal(p.data.company.active, false);
   assert.equal((await call('POST', '/api/companies', { url: 'https://example.com/careers' })).status, 400);
+});
+
+await step('CV roaster: before/after audit, 5 metric bullets, summary', async () => {
+  assert.equal((await call('POST', '/api/roast', { bullets: '' })).status, 400);
+  const r = await call('POST', '/api/roast', { bullets: 'Responsible for end-to-end recruitment for IT roles.\nHandled stakeholder meetings and candidate screening.', domain: 'Cloud' });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.critique.length, 2);
+  assert.equal(r.data.rewrites.length, 5);
+  assert.match(r.data.summary, /0-day notice/);
+  assert.deepEqual(r.data.weakPhrases, ['Responsible for', 'Handled']);
+});
+
+let outreachId = '';
+await step('outreach: three scripts under 60 words, nothing sent', async () => {
+  const r = await call('POST', '/api/outreach', { company: 'Acme', role: 'Senior TA Partner', recipientName: 'Asha Rao', jobId: ids.strong });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.deepEqual(r.data.scripts.map((s) => s.kind), ['head_of_ta', 'peer_referral', 'practice_head']);
+  for (const s of r.data.scripts) assert.ok(s.words <= 60, `${s.kind} has ${s.words} words`);
+  const log = await call('POST', '/api/outreach/log', { company: 'Acme', recipientRole: 'Head of TA', recipientName: 'Asha Rao', kind: 'head_of_ta', message: r.data.scripts[0].message, status: 'sent', jobId: ids.strong });
+  assert.equal(log.status, 201);
+  assert.ok(log.data.item.sentAt);
+  const days = (new Date(log.data.item.followUpAt) - new Date(log.data.item.sentAt)) / 86_400_000;
+  assert.ok(days > 4.9 && days < 5.1, `follow-up in ${days} days`);
+  outreachId = log.data.item.id;
+});
+
+await step('outreach log: due follow-up, reply, delete', async () => {
+  const d = await call('POST', '/api/outreach/log', { company: 'Beta', recipientRole: 'Peer recruiter', kind: 'peer_referral', channel: 'referral', message: 'Hi Ravi, could you refer me?' });
+  assert.equal(d.data.item.status, 'drafted');
+  assert.equal(d.data.item.followUpAt, null);
+  const past = new Date(Date.now() - 86_400_000).toISOString();
+  assert.equal((await call('PATCH', `/api/outreach/${outreachId}`, { followUpAt: past })).status, 200);
+  const due = await call('GET', '/api/outreach?status=sent');
+  assert.equal(due.data.items.length, 1);
+  const rep = await call('PATCH', `/api/outreach/${outreachId}`, { status: 'replied' });
+  assert.equal(rep.data.item.followUpAt, null);
+  assert.equal((await call('DELETE', `/api/outreach/${d.data.item.id}`)).status, 200);
+  assert.equal((await call('DELETE', `/api/outreach/${d.data.item.id}`)).status, 404);
+  // Leave one follow-up due for the dashboard.
+  const again = await call('POST', '/api/outreach/log', { company: 'Gamma', recipientRole: 'Practice Head', kind: 'practice_head', message: 'Hi Meera, quick one about your cloud reqs.', status: 'sent' });
+  await call('PATCH', `/api/outreach/${again.data.item.id}`, { followUpAt: past });
+});
+
+await step('gap scripts: email and phone', async () => {
+  const r = await call('POST', '/api/outreach/gap', { gapSince: 'November 2025' });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.match(r.data.email, /November 2025/);
+  assert.match(r.data.phone, /notice/);
 });
 
 console.log(`\n${passed} end-to-end checks passed.`);

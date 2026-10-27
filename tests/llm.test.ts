@@ -85,6 +85,17 @@ describe('provider layer', () => {
     expect(h(2)['x-opencode-session']).toBeUndefined();
   });
 
+  it('gives thinking models room, and retries once when the answer is cut off', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: '', reasoning_content: 'hmm' }, finish_reason: 'length' }] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: 'ready' }, finish_reason: 'stop' }] })));
+    const out = await chat(llmConfig(settings({ llm_key_opencode: 'k' })), [{ role: 'user', content: 'u' }], { maxTokens: 20 });
+    expect(out.content).toBe('ready');
+    const body = (i: number) => JSON.parse((fetchMock.mock.calls[i][1] as RequestInit).body as string);
+    expect(body(0).max_tokens).toBe(4096);
+    expect(body(1).max_tokens).toBe(12288);
+  });
+
   it('pulls JSON out of fenced or chatty replies', () => {
     expect(extractJson('```json\n{"a":1}\n```')).toEqual({ a: 1 });
     expect(extractJson('Sure! {"a":2} Hope that helps')).toEqual({ a: 2 });

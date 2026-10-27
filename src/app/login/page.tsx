@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api-client';
+import { Logo } from '@/components/nav';
 
 function LoginForm() {
   const params = useSearchParams();
@@ -28,8 +29,11 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto flex max-w-sm flex-col gap-4 pt-16">
-      <h1 className="text-2xl font-bold tracking-tight">HunterOps</h1>
+    <form onSubmit={submit} className="surface hero-glow mx-auto mt-16 flex max-w-sm flex-col gap-5 p-6">
+      <div className="flex flex-col gap-2">
+        <Logo />
+        <p className="text-sm text-muted-foreground">Recruiter command center. Sign in to continue.</p>
+      </div>
       <div className="flex flex-col gap-1">
         <Label htmlFor="pw">Password</Label>
         <Input id="pw" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus />
