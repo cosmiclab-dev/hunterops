@@ -73,6 +73,18 @@ describe('provider layer', () => {
       .rejects.toThrow(/HTTP 400.*It said: "Model requires the Global region"/);
   });
 
+  it('sends a stable x-opencode-session to OpenCode Go only', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response('{"error":"response_format not supported"}', { status: 400 }))
+      .mockImplementation(async () => new Response(JSON.stringify({ choices: [{ message: { content: '{"a":1}' } }] })));
+    await chat(llmConfig(settings({ llm_key_opencode: 'k' })), [{ role: 'user', content: 'u' }], { json: true });
+    const h = (i: number) => (fetchMock.mock.calls[i][1] as RequestInit).headers as Record<string, string>;
+    expect(h(0)['x-opencode-session']).toMatch(/^[0-9a-f-]{36}$/);
+    expect(h(1)['x-opencode-session']).toBe(h(0)['x-opencode-session']);
+    await chat(llmConfig(settings({ llm_provider: 'openai', llm_key_openai: 'k', llm_model: 'gpt-x' })), [{ role: 'user', content: 'u' }]);
+    expect(h(2)['x-opencode-session']).toBeUndefined();
+  });
+
   it('pulls JSON out of fenced or chatty replies', () => {
     expect(extractJson('```json\n{"a":1}\n```')).toEqual({ a: 1 });
     expect(extractJson('Sure! {"a":2} Hope that helps')).toEqual({ a: 2 });

@@ -13,7 +13,9 @@ export type LlmConfig = {
 };
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
-export type ChatOptions = { maxTokens?: number; temperature?: number; json?: boolean; timeoutMs?: number };
+// `session` groups the calls of one task (a draft and its anti-slop rewrite) so
+// gateways such as OpenCode Go can route them together and reuse the prompt cache.
+export type ChatOptions = { maxTokens?: number; temperature?: number; json?: boolean; timeoutMs?: number; session?: string };
 export type ChatResult = { content: string; model: string; usage: unknown };
 
 export type Overrides = { provider?: string; model?: string; key?: string; baseUrl?: string };
@@ -62,13 +64,22 @@ function upstreamHint(cfg: LlmConfig, status: number, raw = '') {
   return `${name} returned HTTP ${status}.${why}`;
 }
 
+// OpenCode Go rejects requests without a stable x-opencode-session header.
+export function gatewayHeaders(cfg: LlmConfig, session?: string): Record<string, string> {
+  let host = '';
+  try { host = new URL(cfg.endpoint).hostname; } catch { /* checked in llmConfig */ }
+  if (cfg.provider !== 'opencode' && !/(^|\.)opencode\.ai$/i.test(host)) return {};
+  return { 'x-opencode-session': session || crypto.randomUUID() };
+}
+
 function buildRequest(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions): { headers: Record<string, string>; body: unknown } {
+  const extra = gatewayHeaders(cfg, opts.session);
   const maxTokens = opts.maxTokens ?? 2000;
   if (cfg.format === 'anthropic') {
     const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
     const rest = messages.filter((m) => m.role !== 'system');
     return {
-      headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.key, 'anthropic-version': '2023-06-01' },
+      headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.key, 'anthropic-version': '2023-06-01', ...extra },
       body: {
         model: cfg.model,
         max_tokens: maxTokens,
@@ -83,6 +94,7 @@ function buildRequest(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions
       'Content-Type': 'application/json',
       'User-Agent': 'hunterops/2.0',
       ...(cfg.key ? { Authorization: `Bearer ${cfg.key}` } : {}),
+      ...extra,
     },
     body: {
       model: cfg.model,
@@ -104,6 +116,7 @@ function readContent(cfg: LlmConfig, data: any): string | undefined {
 }
 
 export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
+  if (!opts.session) opts = { ...opts, session: crypto.randomUUID() };
   const timeoutMs = opts.timeoutMs ?? 55_000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
