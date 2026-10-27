@@ -1,184 +1,113 @@
-# HunterOps: Recruiter Command Center
+# HunterOps v2
 
-A zero-cost job-hunt cockpit for a Senior Recruiter targeting Bengaluru or remote TA roles.
+A job search cockpit for one person, built for iPhone first. It pulls recruiter roles in Bengaluru and remote from company career boards, scores each one against your profile (the Grill), tailors resumes in a clean Swiss layout, and writes recruiter emails that only go out after you approve them.
 
-| Tab | What it does |
+You always apply on the company's own site yourself. HunterOps never submits applications, never scrapes LinkedIn or Naukri, and never sends an email you have not approved.
+
+**Stack:** Next.js 14 (App Router) · Prisma 5 · Neon Postgres · shadcn/ui + Tailwind · Vercel (with a daily cron) · any LLM API, OpenCode Go with DeepSeek by default.
+
+## What it does
+
+| Screen | What you do there |
 | --- | --- |
-| 01 Discovery | One-click Google X-ray searches across Greenhouse, Ashby, Lever, SmartRecruiters, Workday, SuccessFactors, Darwinbox, Keka and Zoho Recruit, with the freshness filter (`&tbs=qdr:d`, `qdr:d2` or `qdr:w`) baked into the URL. Hiring-manager radar for LinkedIn "we're hiring" posts and GCC TA leads. Quick "Add to pipeline" form with ATS auto-detection. |
-| 02 Pipeline | Kanban board or table, live from Neon. Filter by status, search, drag cards between columns or change status in line. Notes, delete, and "Draft" to jump to outreach with the lead pre-filled. |
-| 03 Metric Roaster | Paste Capgemini bullets. DeepSeek flags weak phrasing, shows "Fluffy operational duty" next to "Enterprise scaled metric", writes 5 hardened metrics (time to fill, direct-sourcing ratio, offer-to-join, stakeholder management, agency cost savings) and a two-sentence 0-day-notice pitch. One-click copy everywhere. |
-| 04 Outreach | Company, recipient title and req details in; Head of TA, Peer Referral and Practice Head messages out, each under 60 words with a live word count. Copy, then save to the Neon outreach log (optionally moving the lead to Contacted). |
+| **Job Board** (`/`) | New, Saved, Applied and All tabs; Bengaluru / Remote filters; sort by best fit or newest. Every card shows a **Grill Score badge** (red under 50, yellow 50 to 74, green 75+), matched skills, and missing skills with a `?`. *Scan now* pulls fresh postings. |
+| **Job page** (`/jobs/[id]`) | Status tracker and notes. Tabs: **Grill** (the score broken down), **Resume** (tailor to this job, download PDF or DOCX), **Email** (write, edit, review, approve and send), **JD**, **Slop check**. |
+| **Profile** (`/profile`) | Import your resume from PDF, DOCX or TXT; the model fills the form; you check and save. Saving re-scores every job. Also holds your location rules for the Grill. |
+| **Settings** (`/settings`) | AI provider, model and key; Gmail; feed keywords and locations; company boards (add any Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Recruitee or Workable careers URL). |
 
-The AI never invents numbers. Anything it can't take from your own text comes back as an orange `[X]` slot for you to fill with a figure you can defend.
+## The intelligence modules
 
-## Stack
+All three live in `src/lib/modules/` and are plain TypeScript with no AI call, so they are fast, free and give the same answer every time.
 
-- **Frontend:** `public/`: plain HTML, CSS and ES modules. No build step.
-- **API:** `netlify/functions/` (Netlify Functions v2, Node 20, ES modules), bundled with esbuild.
-  - `db.js`: `/api/jobs`, `/api/jobs/:id`, `/api/outreach`, `/api/health` on Neon via `@neondatabase/serverless` (HTTP driver, no connection pool).
-  - `ai-brain.js`: `/api/ai` with `action: "audit_profile"` or `"generate_outreach"`, proxied to OpenCode Go.
-- **Database:** Neon serverless Postgres, schema in `db/schema.sql`.
-- **AI:** OpenCode Go, OpenAI-compatible chat completions, default model `deepseek-v4.1-flash`.
+### Module A: Anti-Slop (`anti-slop.ts`)
+`BANNED_PHRASES` holds the 16 phrases you specified (delve, testament to, game-changer, landscape, fostering, tapestry, plethora, underscores, paramount, spearheaded, unwavering, digital age, meticulous, navigating, poised to, rich history). Each rule also catches other forms ("delved", "spearheading", "game changer") and skips look-alikes ("landscaped").
+1. Every writing prompt (resume tailoring, emails) tells the model not to use them.
+2. Every draft is scanned; if anything slips through, the draft goes back to the model once for a rewrite.
+3. Whatever remains is highlighted in the app with a plainer word, and you can paste any text into the Slop check tab.
 
-```
-hunterops/
-├── netlify.toml            build settings, /api/* rewrites, security headers
-├── package.json
-├── .env.example
-├── db/schema.sql           tables, constraints, indexes (idempotent)
-├── scripts/migrate.mjs     runs schema.sql against DATABASE_URL
-├── netlify/
-│   ├── functions/
-│   │   ├── db.js           jobs + outreach REST API
-│   │   └── ai-brain.js     OpenCode Go / DeepSeek proxy
-│   └── lib/                shared helpers (http, ats detection, prompts, models)
-├── public/
-│   ├── index.html
-│   ├── favicon.svg
-│   ├── css/styles.css
-│   └── js/                 app, api, store, xray, pipeline, roaster, outreach, dom, ats
-└── test/                   node:test suites (functions against real Postgres + fake AI)
-```
-
-## API
-
-| Method | Path | Body / query | Notes |
-| --- | --- | --- | --- |
-| GET | `/api/jobs` | `?status=contacted` (optional) | Newest first, with `outreach_count` |
-| POST | `/api/jobs` | `{ title, company, url, location?, notes?, ats_type?, status? }` | `ats_type` detected from URL if omitted. Duplicate URL → 409 |
-| PATCH | `/api/jobs/:id` | `{ status?, notes? }` | Status: discovered, contacted, screening, rejected, offer |
-| DELETE | `/api/jobs/:id` | | Cascades to the outreach log |
-| GET | `/api/outreach` | `?job_id=uuid` (optional) | |
-| POST | `/api/outreach` | `{ job_id?, recipient_role, channel, message_sent, mark_contacted? }` | Channel: linkedin_dm, email, referral |
-| GET | `/api/health` | | Which env vars are set, DB reachable, schema present, allowed models |
-| POST | `/api/ai` | `{ action: "audit_profile", bullets, years?, domain?, model? }` | |
-| POST | `/api/ai` | `{ action: "generate_outreach", company, recipient_title, role_url?, req_details?, proof_points?, audiences?, model? }` | `audiences` ⊆ head_of_ta, peer_referral, practice_head |
-| POST | `/api/ai` | `{ action: "test_connection", model? }` | One-word round trip, latency, and OpenCode's live model list |
-
-All `/api/ai` calls accept an optional `X-OpenCode-Key` header (the key from Settings).
-
-## OpenCode Go key and model (in the app)
-
-Click the gear icon, paste your OpenCode Go API key, pick a model and press **Test connection**. Then **Save**.
-
-- **Where the key lives:** in your browser only (localStorage, or this tab only if you untick "Remember on this device"). Each AI request sends it in an `X-OpenCode-Key` header to this site's own `ai-brain` function, which forwards it to OpenCode and never logs or stores it. Nothing goes in the database.
-- **Why not save it on the server:** a single-user app gains nothing from server-side encryption except a second secret (the encryption key) to manage. Keeping it in the browser means no key ever sits at rest on Netlify or Neon. The page's Content-Security-Policy only allows its own scripts, which is the main protection for a key held in the browser.
-- **Fallback:** if no key is entered, the function uses `OPENCODE_API_KEY` from Netlify, limited to `OPENCODE_ALLOWED_MODELS`.
-- **Models:** DeepSeek V4.1 Flash (default) and V4 Pro, plus every other model OpenCode Go serves on its OpenAI-compatible chat endpoint (GLM, Kimi, MiMo, MiniMax, LongCat, Hunyuan, Step), and a custom id field. Test connection also loads OpenCode's live model list. Models on Go's Anthropic or Responses endpoints (Claude, Qwen, MiniMax M3, GPT, Grok, Gemini) don't work with this app's chat-completions call.
-
-## Environment variables
-
-| Name | Required | Value |
+### Module D: The Grill (`grill.ts`)
+| Part | Weight | How it is scored |
 | --- | --- | --- |
-| `DATABASE_URL` | yes | Neon connection string (pooled or direct) |
-| `OPENCODE_API_URL` | no | Defaults to `https://opencode.ai/inference/go/openai/v1` |
-| `OPENCODE_API_KEY` | no | Fallback key. You can paste your key in the app's Settings instead |
-| `OPENCODE_MODEL` | no | Default `deepseek-v4.1-flash` |
-| `OPENCODE_ALLOWED_MODELS` | no | Models allowed with the server key. Default `<OPENCODE_MODEL>,deepseek-v4-pro` |
-| `APP_ACCESS_TOKEN` | strongly recommended | Shared secret. When set, the app asks for it once and sends it on every call |
+| Skills match | 40 | Skills named in the JD's required part (from a recruiting-heavy vocabulary plus your own skills), and the share of them in your Profile skills. Whole-term matching ("java" never matches "javascript") with aliases ("TA" = "talent acquisition"). |
+| Location fit | 20 | Strict. Remote: full marks only if you accept remote and the role is open to India (a "Remote - US" role scores 0). Hybrid or on-site: full marks only in one of your cities. 10 if the posting does not say. |
+| Experience | 20 | Reads "5+ years", "3-6 yrs", "minimum of 8 years". Full marks at or above the minimum, partial credit down to half the minimum, slightly less if you are far above a stated band. |
+| Keywords | 20 | Bonus for the JD's "nice to have" / "preferred" / "a plus" items found anywhere in your profile. If the JD has no such list, the whole JD is used. |
 
-Set `APP_ACCESS_TOKEN` before you share the URL with anyone. Without it, anyone who finds the site can read your pipeline and spend your OpenCode quota.
+Scores are stored on each job with the full breakdown, recomputed when you save your profile or press Re-grill.
 
----
+### Module E: The Designer (`designer.ts` + [`DESIGN.md`](DESIGN.md))
+`DESIGN.md` is the Switzerland Style contract: Inter for headings and text, Roboto Mono for metadata, a 4px baseline grid, three colours (#111111, #FFFFFF, #E5E5E5), single column, 24mm margins. `designer.ts` holds the same values as tokens. The dashboard's Tailwind theme and the PDF/DOCX renderer both read them, and every tailored resume is audited against them (grid alignment, section order, page count for your years, bullet length and count) before you download it.
 
-## Deploy: step by step (free tiers)
+## AI providers (pluggable)
 
-You need Node 20+, Git, a GitHub account, a Netlify account, a Neon account and an OpenCode Go subscription.
-
-### 1. Put the code in a Git repository
-
-```bash
-unzip hunterops.zip && cd hunterops
-git init
-git add .
-git commit -m "HunterOps: initial commit"
+```
+                      ┌────────────────────────── Settings (encrypted in Neon) ─┐
+ resume import  ─┐    │ provider · model · key · base URL (custom only)         │
+ resume tailor  ─┼──▶ llmConfig() ──▶ chat() ──┬─▶ "openai" wire format  ──▶ OpenCode Go (default: deepseek-v4.1-flash)
+ email writer   ─┘                             │                         ──▶ OpenAI · Gemini · OpenRouter · Groq
+                                               │                         ──▶ Custom: Together, Fireworks, Mistral, DeepSeek, vLLM, Ollama…
+                                               └─▶ "anthropic" format    ──▶ Anthropic (Claude)
+                         writer.ts: chatJson() ─▶ Anti-Slop scan ─▶ one rewrite if needed ─▶ app
 ```
 
-Create an empty repository on GitHub (no README), then:
+- **Registry:** `src/lib/llm/providers.ts`. Each provider is one entry: label, wire format, base URL, default model, suggested models, env var for a fallback key. Adding a provider is one entry; nothing else changes.
+- **Client:** `src/lib/llm/client.ts`. `llmConfig(settings)` resolves provider, key, model and endpoint; `chat()` speaks either the OpenAI chat-completions format (Bearer key) or the Anthropic Messages format (`x-api-key`). It retries once without `response_format` or `temperature` if a model rejects them, and turns HTTP errors into plain messages ("rejected the API key", "usage limit reached").
+- **Default:** OpenCode Go, `https://opencode.ai/inference/go/openai/v1/chat/completions`, model `deepseek-v4.1-flash` (switch to `deepseek-v4-pro` in Settings for harder tailoring).
+- **Keys:** pasted in Settings, encrypted with AES-256-GCM using `APP_SECRET`, never sent back to the browser (Settings shows `sk-••••abcd`). Each provider keeps its own key, so you can switch back and forth. Env vars work as a fallback.
+- **Test connection** sends a one-word round trip with the values in the form before you save them.
+
+## Data model
+
+`prisma/schema.prisma`: `Profile` (one row), `Company` (boards to scan), `Job` (feed and tracker in one table, with `grillScore` and `grillBreakdown`), `Resume` (tailored copies, with their Anti-Slop score), `Contact`, `Email` (DRAFT → APPROVED → SENT or FAILED), `ScanRun`, `Setting`. Migrations are in `prisma/migrations` and run on every Vercel build.
+
+## Email safety
+
+- A draft is only sent by `POST /api/emails/[id]/send` with `approve: true` **and** the exact subject and body you reviewed; if the draft changed since, it refuses.
+- The draft is claimed atomically before sending, so a double tap cannot send twice. Sent emails cannot be edited or deleted.
+- A daily cap (default 20, in Settings) limits sends in any 24 hours.
+- Gmail uses an app password over SMTP; nothing else can send.
+
+## Job sources
+
+Company ATS boards via their public JSON APIs: Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Recruitee, Workable (31 boards seeded, add more in Settings). Plus Remotive, RemoteOK, Himalayas, and Adzuna India if you add a free Adzuna key. Titles are matched against your role keywords; locations are sorted into Bengaluru, Remote (India/APAC), Remote (anywhere), elsewhere in India and Remote (other regions). A Vercel Cron runs the scan daily at 08:00 IST.
+
+## Run it locally
 
 ```bash
-git remote add origin https://github.com/<you>/hunterops.git
-git branch -M main
-git push -u origin main
-```
-
-### 2. Create the Neon database and run the schema
-
-1. Sign in at https://console.neon.tech and create a project. Pick the region closest to you (AWS Asia Pacific (Singapore) for Bengaluru).
-2. On the project dashboard click **Connect**, keep the database `neondb`, and copy the connection string. It looks like `postgresql://neondb_owner:...@ep-...-pooler.ap-southeast-1.aws.neon.tech/neondb?sslmode=require`.
-3. Run the schema, either way works:
-   - **Neon SQL Editor:** open **SQL Editor**, paste all of `db/schema.sql`, click **Run**.
-   - **From your machine:**
-     ```bash
-     cp .env.example .env        # paste DATABASE_URL into .env
-     npm install
-     npm run db:migrate
-     ```
-     It prints `Done. Tables present: outreach_logs, saved_jobs, users`.
-
-The schema is idempotent, so running it again is safe.
-
-### 3. Get your OpenCode Go key
-
-1. Subscribe to OpenCode Go at https://opencode.ai/go.
-2. Copy your API key from the OpenCode console.
-3. The base URL for DeepSeek (and the other OpenAI-compatible Go models) is `https://opencode.ai/inference/go/openai/v1`. The function calls `.../chat/completions` on it with `Authorization: Bearer <key>`.
-
-### 4a. Deploy from Git (recommended)
-
-1. In Netlify: **Add new project → Import an existing project → GitHub**, pick the repository.
-2. Netlify reads `netlify.toml`, so leave the build settings as they are (publish directory `public`, functions `netlify/functions`).
-3. Before the first deploy, open **Site configuration → Environment variables → Add a variable** and add `DATABASE_URL` and `APP_ACCESS_TOKEN`. Add `OPENCODE_API_KEY` too only if you'd rather keep the key on the server than paste it in the app. (`APP_ACCESS_TOKEN` can be generated with `node -e "console.log(crypto.randomUUID()+crypto.randomUUID())"`.) Mark them as secret.
-4. Click **Deploy**. Every `git push` to `main` redeploys.
-
-### 4b. Or deploy with the Netlify CLI
-
-```bash
-npm install -g netlify-cli
-netlify login
-netlify init                 # create a new site, link it to this folder / repo
-
-netlify env:set DATABASE_URL "postgresql://..."      --secret
-netlify env:set APP_ACCESS_TOKEN "..."               --secret
-# optional, only if you don't want to paste the key in the app:
-netlify env:set OPENCODE_API_KEY "..."               --secret
-
-netlify deploy               # draft URL to check
-netlify deploy --prod        # go live
-```
-
-### 5. Check it's live
-
-Open the site. If the app is locked, it asks for your access key once. Click the gear icon, paste your OpenCode Go key, choose a model, press **Test connection**, then **Save**. The **DB** and **AI** dots in the top right should both be green.
-
-- DB amber: connected, but the schema hasn't been run. Go back to step 2.3.
-- DB red: `DATABASE_URL` missing or wrong.
-- AI red: no key yet. Add one in Settings (or set `OPENCODE_API_KEY`).
-
-After changing environment variables, redeploy (**Deploys → Trigger deploy**) so functions pick them up.
-
-## Run locally
-
-```bash
-cp .env.example .env     # fill in the values
 npm install
-npm run dev              # netlify dev on http://localhost:8888, functions + redirects included
+cp .env.example .env          # fill DATABASE_URL, DIRECT_URL, APP_SECRET
+npx prisma migrate deploy
+npm run dev                   # http://localhost:3000
 ```
 
 ## Tests
 
-The suites run the real function handlers against a local Postgres (through a stand-in for the Neon driver) and a fake OpenCode server. Node 22.3+ is needed for module mocking.
-
 ```bash
-createdb hunterops_test
-TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/hunterops_test npm test
+npm test          # unit tests: Anti-Slop, Grill, scanner, renderer + Designer audit, provider layer
+npm run e2e       # end to end (needs a throwaway Postgres in .env.e2e and Playwright)
 ```
 
-Without `TEST_DATABASE_URL` the database tests are skipped and the AI tests still run.
+`npm run e2e` resets the database in `.env.e2e`, builds the app, starts a mock OpenAI-compatible model server and a local SMTP server, then runs 25 API checks (login, encrypted keys, PDF import, Grill bands, filters, tailoring with the Anti-Slop rewrite, PDF/DOCX download, approve-then-send, daily cap, cron auth) and an iPhone-size browser pass with screenshots. `.env.e2e` looks like:
 
-## Limits worth knowing
+```
+DATABASE_URL=postgresql://postgres:pg@localhost:5432/hunterops
+DIRECT_URL=postgresql://postgres:pg@localhost:5432/hunterops
+APP_SECRET=any-32-plus-character-test-secret-value
+APP_PASSWORD=letmein
+CRON_SECRET=cronsecret
+SMTP_HOST=127.0.0.1
+SMTP_PORT=2525
+```
 
-- Netlify synchronous functions stop at 60 seconds. The AI call gives up at 50 seconds with a clear error. `deepseek-v4.1-flash` normally answers well inside that.
-- OpenCode Go has usage limits per 5 hours, week and month. A 429 from it shows as "usage limit reached".
-- Google sometimes shows a CAPTCHA for repeated `site:` searches. Slow down, or sign in to Google.
-- Data is single-user: there is no per-user separation. The `users` table exists for later multi-user work.
+## Deploy (Vercel + Neon)
+
+1. Import the repo in Vercel (framework: Next.js).
+2. Set `DATABASE_URL` (pooled), `DIRECT_URL` (direct), `APP_SECRET`, `APP_PASSWORD`, `CRON_SECRET`.
+3. Deploy. The build runs the migrations.
+4. Open the site on your iPhone, sign in, then Share → Add to Home Screen.
+5. Settings: paste your OpenCode Go key (Test connection, Save), add Gmail. Profile: import your resume. Board: Scan now.
+
+## Credits
+
+- Grill keyword matching follows the whole-term approach in [srbhr/Resume-Matcher](https://github.com/srbhr/Resume-Matcher) (Apache-2.0). No code was copied.
+- Resume section order and ATS rules are informed by [zapplyjobs/resume-samples-2026](https://github.com/zapplyjobs/resume-samples-2026). That repo has no license, so nothing from it is included.
