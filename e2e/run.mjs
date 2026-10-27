@@ -328,4 +328,201 @@ await step('gap scripts: email and phone', async () => {
   assert.match(r.data.phone, /notice/);
 });
 
+// ---- v2: in-app Browser, Grill a URL, Auto-Fill, cover letters, Discover ----
+const GH_URL = 'https://job-boards.greenhouse.io/acmecloud/jobs/555';
+const LEVER_URL = 'https://jobs.lever.co/acmepay/0f2a1b3c-1111-2222-3333-444455556666';
+const PAGE_URL = 'http://127.0.0.1:4020/careers/senior-recruiter';
+
+await step('upload a CV with save=1 (Home setup): profile saved, pay and location prefs kept', async () => {
+  const p = (await call('GET', '/api/profile')).data.profile;
+  await call('PUT', '/api/profile', { profile: { ...p, acceptRemote: true, expectedSalaryLpa: 25, currentCtcLpa: 18, noticePeriod: 'Immediate' } });
+  const form = new FormData();
+  form.append('file', new Blob([fs.readFileSync(new URL('./fixtures/resume.pdf', import.meta.url))], { type: 'application/pdf' }), 'resume.pdf');
+  form.append('save', '1');
+  const r = await call('POST', '/api/profile/import', form);
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.saved, true);
+  assert.ok(r.data.grilled >= 3);
+  const saved = (await call('GET', '/api/profile')).data.profile;
+  assert.equal(saved.name, 'Divya Sharma');
+  assert.equal(saved.expectedSalaryLpa, 25);
+  assert.equal(saved.noticePeriod, 'Immediate');
+  assert.equal(saved.acceptRemote, true);
+});
+
+await step('Grill a URL (POST /api/grill { url }) without saving it', async () => {
+  const r = await call('POST', '/api/grill', { url: PAGE_URL });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.job.title, 'Senior Recruiter');
+  assert.equal(r.data.job.company, 'Zeta Labs');
+  assert.ok(r.data.grill.score >= 60, `scored ${r.data.grill.score}`);
+  assert.equal(r.data.grill.salary.max, 20);
+  assert.equal(r.data.grill.salary.offeredMin, 20);
+  assert.ok(Array.isArray(r.data.grill.missingKeywords));
+  assert.equal(execFileSync('psql', [process.env.DATABASE_URL, '-tAc', "SELECT count(*) FROM jobs WHERE company = 'Zeta Labs'"]).toString().trim(), '0');
+  assert.equal((await call('POST', '/api/grill', { url: 'http://localhost:1/x' })).status >= 400, true);
+  assert.equal((await call('POST', '/api/grill', { url: 'ftp://example.com' })).status, 400);
+});
+
+let ghJob;
+await step('import a Greenhouse link: description, salary-aware Grill, company board tracked', async () => {
+  const r = await call('POST', '/api/jobs/import', { url: GH_URL });
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  ghJob = r.data.job;
+  assert.equal(ghJob.title, 'Senior Talent Acquisition Partner');
+  assert.equal(ghJob.company, 'Acme Cloud');
+  assert.equal(ghJob.status, 'SAVED');
+  assert.match(ghJob.description, /Bengaluru GCC/);
+  assert.equal(r.data.grill.salary.score, 20, JSON.stringify(r.data.grill.salary));
+  assert.ok(r.data.grill.score >= 75, `scored ${r.data.grill.score}`);
+  const companies = (await call('GET', '/api/companies')).data.companies;
+  assert.ok(companies.some((c) => c.atsType === 'greenhouse' && c.atsSlug === 'acmecloud'));
+  const again = await call('POST', '/api/jobs/import', { url: GH_URL });
+  assert.equal(again.status, 200);
+  assert.equal(again.data.job.id, ghJob.id);
+});
+
+await step('in-app Browser: Greenhouse job opens with a clean reader, official apply form and Grill', async () => {
+  const r = await call('POST', '/api/browser/open', { jobId: ghJob.id });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.job.id, ghJob.id);
+  assert.match(r.data.page.html, /Bengaluru GCC/);
+  assert.ok(!/<script/i.test(r.data.page.html), 'script tag in reader html');
+  assert.match(r.data.page.embedUrl, /boards\.greenhouse\.io\/embed\/job_app\?for=acmecloud&token=555/);
+  assert.equal(r.data.page.frameable, true);
+  assert.ok(r.data.grill.score >= 75);
+  assert.equal(r.data.page.fields.length, 7);
+});
+
+await step('in-app Browser: plain careers page via the proxy (JSON-LD, sanitized, refuses framing)', async () => {
+  const r = await call('POST', '/api/browser/open', { url: PAGE_URL });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.page.title, 'Senior Recruiter');
+  assert.equal(r.data.page.frameable, false);
+  assert.equal(r.data.job, null);
+  assert.ok(!/<script|onclick/i.test(r.data.page.html));
+  assert.ok(r.data.page.fields.some((f) => f.key === 'first_name'));
+  assert.equal((await call('POST', '/api/browser/open', {})).status, 400);
+  assert.equal((await call('POST', '/api/browser/open', { url: 'http://127.0.0.1:4020/nope' })).status >= 400, true);
+});
+
+await step('Auto-Fill: Greenhouse questions answered from the profile and AI, saved to the job', async () => {
+  const r = await call('POST', '/api/autofill', { jobId: ghJob.id });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const by = Object.fromEntries(r.data.answers.map((a) => [a.key, a]));
+  assert.equal(by.first_name.value, 'Divya');
+  assert.equal(by.last_name.value, 'Sharma');
+  assert.equal(by.email.value, 'divya@example.com');
+  assert.equal(by.resume.type, 'file');
+  assert.equal(by.question_1.value, '25 LPA');
+  assert.equal(by.question_2.value, 'Immediate');
+  assert.equal(by.question_3.source, 'ai');
+  assert.match(by.question_3.value, /Capgemini/);
+  assert.equal(r.data.generic, false);
+  const reopened = await call('POST', '/api/browser/open', { jobId: ghJob.id });
+  assert.equal(reopened.data.autofill.answers.length, 7);
+});
+
+await step('Auto-Fill: Lever apply form fields read from the page; profile-only mode works', async () => {
+  const r = await call('POST', '/api/autofill', { url: LEVER_URL, ai: false });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const keys = r.data.answers.map((a) => a.key);
+  assert.ok(!keys.includes('token'), 'hidden token field leaked');
+  const by = Object.fromEntries(r.data.answers.map((a) => [a.key, a]));
+  assert.equal(by.name.value, 'Divya Sharma');
+  assert.equal(by.phone.value, '+91 90000 00000');
+  assert.equal(by.org.value, 'Capgemini');
+  assert.equal(by['cards[abc][field0]'].value, '');
+});
+
+await step('Module B: AIDA cover letter (POST /api/draft-email), Anti-Slop strips "delve", saved as an artifact', async () => {
+  const r = await call('POST', '/api/draft-email', { jobId: ghJob.id, framework: 'AIDA' });
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  assert.ok(r.data.coverLetter.body.length > 40);
+  assert.ok(!/delve/i.test(r.data.coverLetter.body));
+  assert.equal(r.data.slop.clean, true);
+  assert.equal(r.data.email, null);
+  const pas = await call('POST', '/api/draft-email', { jobId: ghJob.id, framework: 'PAS', toEmail: 'meera@acmecloud.example' });
+  assert.equal(pas.status, 201);
+  assert.equal(pas.data.email.status, 'DRAFT');
+  assert.equal(pas.data.email.kind, 'cover_letter');
+  assert.equal(pas.data.email.framework, 'pas');
+  const out = execFileSync('psql', [process.env.DATABASE_URL, '-tAc', `SELECT length(cover_letter_text) > 0, jsonb_array_length(email_drafts) FROM artifacts WHERE job_id = '${ghJob.id}'`]).toString().trim();
+  assert.equal(out, 't|2');
+  assert.equal((await call('POST', '/api/draft-email', { jobId: ghJob.id, toEmail: 'bad' })).status, 400);
+});
+
+await step('Module C: plain English (ASD-STE100) rewrite', async () => {
+  const r = await call('POST', '/api/refine', { text: 'We leveraged synergies to spearhead a paradigm shift in talent acquisition.' });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.sentences, 2);
+  assert.match(r.data.text, /We hired 120 engineers/);
+});
+
+await step('Module A: extra banned words from Settings are enforced', async () => {
+  assert.equal((await call('PUT', '/api/settings', { values: { banned_words_extra: 'rockstar, ninja' } })).status, 200);
+  const r = await call('POST', '/api/slop', { text: 'We need a rockstar recruiter.' });
+  assert.ok(r.data.report.hits.some((h) => /rockstar/i.test(h.phrase)), JSON.stringify(r.data.report));
+  await call('PUT', '/api/settings', { values: { banned_words_extra: '' } });
+});
+
+await step('Mailroom: an email draft without a job (company and role typed in)', async () => {
+  const r = await call('POST', '/api/emails', { company: 'Orbit Labs', role: 'TA Lead', toEmail: 'hr@orbit.example', kind: 'cold', framework: 'pas' });
+  assert.equal(r.status, 201, JSON.stringify(r.data));
+  assert.equal(r.data.email.jobId, null);
+  assert.equal(r.data.email.status, 'DRAFT');
+  assert.equal((await call('POST', '/api/emails', { toEmail: 'hr@orbit.example' })).status, 400);
+});
+
+await step('Discover in-app: no key shows the setup state; with a Serper key results arrive in the app', async () => {
+  const off = await call('POST', '/api/discover/search', { roles: ['Talent Acquisition'], locations: ['bengaluru', 'remote'], window: 'd' });
+  assert.equal(off.status, 200, JSON.stringify(off.data));
+  assert.equal(off.data.webEnabled, false);
+  assert.deepEqual(off.data.web, []);
+  assert.ok(off.data.board.some((j) => j.id === ghJob.id), 'fresh board job missing');
+  assert.equal((await call('PUT', '/api/settings', { values: { search_provider: 'serper', search_api_key: 'serper-e2e' } })).status, 200);
+  const on = await call('POST', '/api/discover/search', { roles: ['Talent Acquisition'], locations: ['bengaluru', 'remote'], window: 'd', people: true });
+  assert.equal(on.status, 200, JSON.stringify(on.data));
+  assert.equal(on.data.webEnabled, true);
+  assert.equal(on.data.provider, 'serper');
+  const gh = on.data.web.find((w) => w.ats === 'greenhouse');
+  assert.ok(gh, JSON.stringify(on.data.web));
+  assert.equal(gh.inApp, true);
+  assert.equal(gh.jobId, ghJob.id, 'saved Greenhouse job not matched');
+  const lv = on.data.web.find((w) => w.ats === 'lever');
+  assert.equal(lv.jobId, null);
+  assert.ok(!on.data.web.some((w) => /google\./.test(w.url)));
+  assert.equal(on.data.people[0].name, 'Meera Iyer - Head of Talent Acquisition - Acme Cloud');
+  const bad = await call('PUT', '/api/settings', { values: { search_api_key: 'wrong' } });
+  assert.equal(bad.status, 200);
+  const err = await call('POST', '/api/discover/search', { roles: ['Recruiter'] });
+  assert.ok(err.data.errors.length >= 1);
+  await call('PUT', '/api/settings', { values: { search_api_key: 'serper-e2e' } });
+});
+
+await step('Pipeline columns: Scouted, Grilled 75+, Applied, Rejected', async () => {
+  const res = await call('GET', '/pipeline', undefined, { raw: true });
+  assert.equal(res.status, 200);
+  const html = await res.text();
+  for (const c of ['Scouted', 'Grilled', 'Applied', 'Rejected']) assert.ok(html.includes(c), `${c} column missing`);
+  assert.equal((await call('PATCH', `/api/jobs/${ghJob.id}`, { status: 'REJECTED' })).status, 200);
+  assert.equal((await call('PATCH', `/api/jobs/${ghJob.id}`, { status: 'SAVED' })).status, 200);
+});
+
+await step('scan summary says how many matches are already on the board', async () => {
+  const r = await call('POST', '/api/scan', { force: true });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(typeof r.data.already_on_board, 'number');
+});
+
+await step('every app page renders for a signed-in user', async () => {
+  for (const path of ['/', '/discover', '/pipeline', '/browser', `/browser/${ghJob.id}`, `/browser?url=${encodeURIComponent(PAGE_URL)}`, '/mailroom', '/jobs', `/jobs/${ghJob.id}`, '/profile', '/settings']) {
+    const res = await call('GET', path, undefined, { raw: true });
+    assert.equal(res.status, 200, `${path} → ${res.status}`);
+  }
+  const old = await call('GET', '/outreach', undefined, { raw: true });
+  assert.ok([307, 308].includes(old.status));
+  assert.match(old.headers.get('location'), /\/mailroom/);
+});
+
 console.log(`\n${passed} end-to-end checks passed.`);

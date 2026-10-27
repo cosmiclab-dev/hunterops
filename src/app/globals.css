@@ -16,58 +16,60 @@
    script in layout.tsx (system setting by default, or the Settings toggle). */
 @layer base {
   :root {
-    --background: 240 9% 97%;
-    --foreground: 0 0% 6.7%;
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 6.7%;
+    --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 6.7%;
-    --primary: 248 82% 58%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 6% 94%;
-    --secondary-foreground: 0 0% 6.7%;
-    --muted: 240 6% 94%;
-    --muted-foreground: 240 4% 40%;
-    --accent: 240 6% 93%;
-    --accent-foreground: 0 0% 6.7%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 72% 36%;
-    --warning: 38 92% 44%;
-    --info: 199 89% 42%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 86%;
-    --ring: 248 82% 58%;
-    --radius: 12px;
-    --shadow: 0 1px 2px rgb(17 17 17 / 0.04), 0 4px 16px -4px rgb(17 17 17 / 0.08);
-    --glow: 248 82% 58%;
+    --success: 142 72% 32%;
+    --warning: 32 95% 44%;
+    --info: 199 89% 40%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 88%;
+    --ring: 243 75% 59%;
+    --radius: 8px;
+    --shadow: 0 1px 2px rgb(9 9 11 / 0.05);
+    --sidebar: 240 4.8% 97.5%;
+    --glow: 243 75% 59%;
     color-scheme: light;
   }
   .dark {
-    --background: 228 24% 5%;
-    --foreground: 220 20% 94%;
-    --card: 228 20% 8.5%;
-    --card-foreground: 220 20% 94%;
-    --popover: 228 20% 9%;
-    --popover-foreground: 220 20% 94%;
-    --primary: 250 100% 72%;
-    --primary-foreground: 228 24% 6%;
-    --secondary: 228 16% 13%;
-    --secondary-foreground: 220 20% 94%;
-    --muted: 228 16% 12%;
-    --muted-foreground: 225 10% 62%;
-    --accent: 228 16% 14%;
-    --accent-foreground: 220 20% 94%;
-    --destructive: 0 84% 62%;
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 8% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 8% 6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 239 84% 70%;
+    --primary-foreground: 240 10% 3.9%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 3.7% 13%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 72% 58%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 69% 52%;
-    --warning: 43 96% 58%;
-    --info: 199 92% 62%;
-    --border: 228 14% 16%;
-    --input: 228 14% 20%;
-    --ring: 250 100% 72%;
-    --shadow: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 24px -8px rgb(0 0 0 / 0.6);
-    --glow: 250 100% 72%;
+    --success: 142 69% 50%;
+    --warning: 38 92% 56%;
+    --info: 199 89% 60%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 19%;
+    --ring: 239 84% 70%;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+    --sidebar: 240 8% 5%;
+    --glow: 239 84% 70%;
     color-scheme: dark;
   }
   * { @apply border-border; }
@@ -85,17 +87,15 @@
   .meta { @apply font-mono text-xs leading-4 text-muted-foreground; }
   .label-caps { @apply font-mono text-[11px] font-medium uppercase tracking-[0.08em] leading-4; }
   .surface { @apply rounded-xl border bg-card text-card-foreground; box-shadow: var(--shadow); }
-  .page-title { @apply text-[28px] font-extrabold leading-9 tracking-tight; }
+  .page-title { @apply text-2xl font-semibold leading-8 tracking-tight; }
   .section-title { @apply label-caps text-muted-foreground; }
   .chip {
     @apply inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3 text-xs font-medium transition-colors;
   }
-  .chip[data-on='true'] { @apply border-primary bg-primary text-primary-foreground; }
-  .hero-glow {
-    background:
-      radial-gradient(120% 80% at 0% 0%, hsl(var(--glow) / 0.22), transparent 60%),
-      radial-gradient(90% 70% at 100% 0%, hsl(var(--info) / 0.14), transparent 60%);
-  }
+  .chip[data-on='true'] { @apply border-foreground bg-foreground text-background; }
+  /* Kept as a hook; the flat shadcn look uses no gradients. */
+  .hero-glow { background: transparent; }
+  .kbd { @apply rounded border bg-muted px-1.5 font-mono text-[11px] text-muted-foreground; }
   .scroll-x { @apply -mx-4 overflow-x-auto px-4; scrollbar-width: none; }
   .scroll-x::-webkit-scrollbar { display: none; }
 }

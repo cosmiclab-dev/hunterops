@@ -14,6 +14,7 @@ const EMPTY: ProfileInput = {
   name: '', headline: '', email: '', phone: '', location: '', linkedin: '', portfolio: '', summary: '',
   skills: [], experience: [], education: [], certifications: [], achievements: [],
   yearsExperience: null, acceptRemote: true, acceptHybrid: true, onsiteCities: ['Bengaluru'],
+  expectedSalaryLpa: null, currentCtcLpa: null, noticePeriod: '',
 };
 
 const lines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean);
@@ -42,11 +43,11 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
     try {
       const form = new FormData();
       form.append('file', f);
-      const { draft, model, chars } = await api<{ draft: ProfileInput; model: string; chars: number }>('/api/profile/import', { method: 'POST', body: form });
-      setP({ ...draft, acceptRemote: p.acceptRemote, acceptHybrid: p.acceptHybrid, onsiteCities: p.onsiteCities });
+      const { draft, model, chars, warning } = await api<{ draft: ProfileInput; model: string | null; chars: number; warning: string | null }>('/api/profile/import', { method: 'POST', body: form });
+      setP({ ...draft, acceptRemote: p.acceptRemote, acceptHybrid: p.acceptHybrid, onsiteCities: p.onsiteCities, expectedSalaryLpa: p.expectedSalaryLpa, currentCtcLpa: p.currentCtcLpa, noticePeriod: p.noticePeriod });
       setSkillsText(draft.skills.join(', '));
       setRev((r) => r + 1);
-      setMsg(`Read ${chars.toLocaleString()} characters with ${model}. Check everything below, then Save.`);
+      setMsg(warning || `Read ${chars.toLocaleString()} characters with ${model}. Check everything below, then Save.`);
     } catch (e) {
       setErr((e as Error).message);
       setMsg('');
@@ -81,7 +82,7 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="surface hero-glow flex flex-col gap-3 p-4 md:p-5">
+      <section className="surface flex flex-col gap-3 p-4 md:p-5">
         <div className="flex items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Upload className="h-5 w-5" /></span>
           <div>
@@ -107,6 +108,19 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
           <Input id="years" inputMode="decimal" value={p.yearsExperience ?? ''} onChange={(e) => set('yearsExperience', e.target.value ? Number(e.target.value) : null)} />
         </Field>
         <Field label="Portfolio" id="portfolio"><Input id="portfolio" value={p.portfolio} onChange={(e) => set('portfolio', e.target.value)} /></Field>
+      </section>
+
+      <section className="surface grid grid-cols-1 gap-4 p-4 md:grid-cols-3 md:p-5">
+        <h2 className="section-title md:col-span-3">Pay and availability (Grill salary fit and Browser auto-fill)</h2>
+        <Field label="Expected CTC (lakh per year)" id="expected">
+          <Input id="expected" inputMode="decimal" value={p.expectedSalaryLpa ?? ''} onChange={(e) => set('expectedSalaryLpa', e.target.value ? Number(e.target.value) : null)} placeholder="24" />
+        </Field>
+        <Field label="Current or last CTC (lakh per year)" id="current">
+          <Input id="current" inputMode="decimal" value={p.currentCtcLpa ?? ''} onChange={(e) => set('currentCtcLpa', e.target.value ? Number(e.target.value) : null)} placeholder="18" />
+        </Field>
+        <Field label="Notice period" id="notice">
+          <Input id="notice" value={p.noticePeriod} onChange={(e) => set('noticePeriod', e.target.value)} placeholder="Immediate (0 days)" />
+        </Field>
       </section>
 
       <section className="surface flex flex-col gap-4 p-4 md:p-5">

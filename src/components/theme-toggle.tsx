@@ -33,7 +33,7 @@ export function ThemeButton({ className }: { className?: string }) {
     <button
       type="button"
       onClick={() => set(next.value)}
-      className={cn('inline-flex h-9 w-9 items-center justify-center rounded-full border bg-card text-muted-foreground transition-colors hover:text-foreground', className)}
+      className={cn('inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground', className)}
       aria-label={`Theme: ${cur.label}. Switch to ${next.label}`}
       title={`Theme: ${cur.label}`}
     >

@@ -85,3 +85,16 @@ export function auditResume(stats: LayoutStats, opts: { yearsExperience?: number
 
 // Snap a value to the grid (used by the renderer for every vertical step).
 export const snap = (pt: number) => Math.round(pt / DESIGN.gridPt) * DESIGN.gridPt;
+
+// Module E entry point: the DESIGN.md audit plus page overflow (text that would
+// spill past the target page) and the margin contract the renderer is held to.
+export function validateLayout(stats: LayoutStats & { marginMm?: number }, opts: { yearsExperience?: number | null } = {}): { ok: boolean; issues: DesignIssue[] } {
+  const issues = auditResume(stats, opts);
+  if (stats.overflowLines > 0) {
+    issues.unshift({ level: 'error', rule: 'overflow', message: `${stats.overflowLines} lines overflow the page. Switch to Compact or cut older bullets.` });
+  }
+  if (stats.marginMm !== undefined && Math.abs(stats.marginMm - DESIGN.page.marginMm) > 0.5) {
+    issues.push({ level: 'error', rule: 'margins', message: `Margins are ${stats.marginMm}mm; DESIGN.md sets ${DESIGN.page.marginMm}mm.` });
+  }
+  return { ok: !issues.some((i) => i.level === 'error'), issues };
+}

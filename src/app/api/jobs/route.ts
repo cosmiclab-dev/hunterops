@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { HttpError, ok, readJson, route } from '@/lib/http';
 import { classifyLocation, detectWorkMode } from '@/lib/location';
 import { grill } from '@/lib/modules/grill';
-import { loadProfile, toGrillProfile } from '@/lib/profile';
+import { loadProfile, profileIsEmpty, toGrillProfile } from '@/lib/profile';
 import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +22,7 @@ export const POST = route(async (req: Request) => {
   if (await prisma.job.findUnique({ where: { url: body.url } })) throw new HttpError(409, 'That job is already on the board.');
   const workMode = detectWorkMode(body.location, body.description);
   const profile = await loadProfile();
-  const g = profile ? grill(toGrillProfile(profile), { ...body, workMode }) : null;
+  const g = profile && !profileIsEmpty(profile) ? grill(toGrillProfile(profile), { ...body, workMode }) : null;
   const job = await prisma.job.create({
     data: {
       ...body,

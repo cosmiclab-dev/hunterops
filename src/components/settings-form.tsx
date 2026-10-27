@@ -20,10 +20,10 @@ const LOCATION_OPTIONS = {
   remote_other: 'Remote (other regions)',
 };
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
   return (
-    <section className="surface flex flex-col gap-4 p-4 md:p-5">
-      <h2 className="text-base font-bold">{title}</h2>
+    <section id={id} className="surface flex scroll-mt-8 flex-col gap-4 p-4 md:p-5">
+      <h2 className="text-base font-semibold">{title}</h2>
       {children}
     </section>
   );
@@ -54,6 +54,11 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
     adzunaKey: '',
   });
   const [feedMsg, setFeedMsg] = useState({ msg: '', err: '' });
+
+  const [search, setSearch] = useState({ provider: initial.search_provider.value && initial.search_provider.value !== 'none' ? initial.search_provider.value : 'serper', key: '' });
+  const [searchMsg, setSearchMsg] = useState({ msg: '', err: '' });
+  const [banned, setBanned] = useState(initial.banned_words_extra.value || '');
+  const [bannedMsg, setBannedMsg] = useState({ msg: '', err: '' });
 
   const [companies, setCompanies] = useState(initialCompanies);
   const [careersUrl, setCareersUrl] = useState('');
@@ -117,6 +122,29 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
     }
   }
 
+  async function saveSearch() {
+    setSearchMsg({ msg: '', err: '' });
+    try {
+      const values: Record<string, string | null> = { search_provider: search.provider };
+      if (search.key) values.search_api_key = search.key;
+      await save(values);
+      setSearch({ ...search, key: '' });
+      setSearchMsg({ msg: 'Saved. Discover now shows web results inside HunterOps.', err: '' });
+    } catch (e) {
+      setSearchMsg({ msg: '', err: (e as Error).message });
+    }
+  }
+
+  async function saveBanned() {
+    setBannedMsg({ msg: '', err: '' });
+    try {
+      await save({ banned_words_extra: banned.trim() || null });
+      setBannedMsg({ msg: 'Saved. Drafts with these words are rewritten or rejected.', err: '' });
+    } catch (e) {
+      setBannedMsg({ msg: '', err: (e as Error).message });
+    }
+  }
+
   async function saveFeed() {
     setFeedMsg({ msg: '', err: '' });
     try {
@@ -173,7 +201,7 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         <p className="text-sm leading-5">Default: OpenCode Go with DeepSeek. Any provider below works the same way: pick it, paste a key, pick a model. The custom option takes any OpenAI-compatible API.</p>
         <div className="flex flex-col gap-1">
           <Label htmlFor="provider">Provider</Label>
-          <select id="provider" value={provider} onChange={(e) => { setProvider(e.target.value); setModel(''); setKey(''); }} className="h-11 rounded-lg border bg-card px-3">
+          <select id="provider" value={provider} onChange={(e) => { setProvider(e.target.value); setModel(''); setKey(''); }} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
             {Object.entries(providers).map(([id, p]) => <option key={id} value={id}>{p.label}</option>)}
           </select>
         </div>
@@ -240,6 +268,35 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         </div>
         <Button className="self-start" onClick={saveFeed}>Save</Button>
         <Status {...feedMsg} />
+      </Section>
+
+      <Section title="Web search (Discover)" id="search">
+        <p className="text-sm leading-6 text-muted-foreground">
+          Discover runs X-Ray searches of Greenhouse, Lever, Ashby, SmartRecruiters and Workday through a search API, so results open inside HunterOps.
+          Easiest: create a free key at <a className="font-medium text-foreground underline" href="https://serper.dev" target="_blank" rel="noopener noreferrer">serper.dev</a> (Google results, 2,500 free searches, no card).
+        </p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="sprov">Search API</Label>
+            <select id="sprov" value={search.provider} onChange={(e) => setSearch({ ...search, provider: e.target.value })} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+              <option value="serper">Serper (Google results)</option>
+              <option value="brave">Brave Search API</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="skey">API key</Label>
+            <Input id="skey" type="password" autoComplete="off" value={search.key} onChange={(e) => setSearch({ ...search, key: e.target.value })} placeholder={s.search_api_key.hint ? `Saved: ${s.search_api_key.hint}` : 'Paste key'} />
+          </div>
+        </div>
+        <Button className="self-start" onClick={saveSearch}>Save</Button>
+        <Status {...searchMsg} />
+      </Section>
+
+      <Section title="Anti-Slop: extra banned words">
+        <p className="text-sm leading-6 text-muted-foreground">On top of the 16 built-in phrases (delve, testament to, landscape, tapestry…). Comma or one per line. Any AI draft that still uses them after one rewrite is rejected.</p>
+        <Textarea id="banned" rows={3} value={banned} onChange={(e) => setBanned(e.target.value)} placeholder="synergy, leverage, passionate" aria-label="Extra banned words" />
+        <Button className="self-start" onClick={saveBanned}>Save</Button>
+        <Status {...bannedMsg} />
       </Section>
 
       <Section title={`Company boards (${companies.filter((c) => c.active).length} active)`}>

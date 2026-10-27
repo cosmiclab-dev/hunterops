@@ -8,39 +8,45 @@ You always apply on the company's own site yourself. HunterOps never submits app
 
 ## What it does
 
+Everything happens inside the app. A fixed left sidebar on laptops (Discover, Pipeline, Browser, Mailroom, plus All jobs, Profile and Settings) and a five-tab bar on iPhone.
+
 | Screen | What you do there |
 | --- | --- |
-| **Home** (`/`) | Countdown to the 31 December offer goal, weekly activity target, stat tiles, jobs found in the last 24 hours, pipeline split, 14-day activity chart, follow-ups due and quick actions. |
-| **Discover** (`/discover`) | X-Ray search launcher: pick role titles, location and window (24h, 48h, week) and get one Google search per ATS (Greenhouse, Ashby, Lever, SmartRecruiters, Workday) with the time filter built in, plus hiring-post and TA-leader finders. Quick add puts any posting on the board and grills it. Nothing is scraped: each link opens a normal search in your browser. |
-| **Pipeline** (`/pipeline`) | Kanban board: Saved, Applied, Interview, Offer, Closed. Drag cards on desktop; use the Move menu on iPhone. |
-| **Outreach** (`/outreach`) | **Write**: three messages under 60 words (Head of TA, peer referral, Practice Head) with word counts and Anti-Slop. **Gap scripts**: a screening-email paragraph and a phone-screen answer for the career gap. **Log**: every message you send by hand, with a follow-up reminder 5 days later, snooze and "got a reply". |
-| **Jobs** (`/jobs`) | New, Saved, Applied and All tabs; Bengaluru / Remote filters; sort by best fit or newest. Every card shows a **Grill Score badge** (red under 50, yellow 50 to 74, green 75+), matched skills, and missing skills with a `?`. *Scan now* pulls fresh postings. |
-| **Job page** (`/jobs/[id]`) | Status tracker and notes. Tabs: **Grill** (the score broken down), **Resume** (tailor to this job, download PDF or DOCX), **Email** (write, edit, review, approve and send), **JD**, **Slop check**. |
-| **Profile** (`/profile`) | **CV roaster** tab: paste bullets and get a TA Director's red-line audit (before and after, with a verdict and reason per bullet), five enterprise-metric bullets and a 3-sentence immediate-availability summary. **Profile** tab: import your resume from PDF, DOCX or TXT; the model fills the form; you check and save. Saving re-scores every job. Also holds your location rules for the Grill. |
-| **Settings** (`/settings`) | Theme (Auto follows the phone, or Light or Dark), AI provider, model and key; Gmail; feed keywords and locations; company boards (add any Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Recruitee or Workable careers URL). |
+| **Home** (`/`) | Setup steps until you're ready (upload your CV, AI key, pay and notice, search key, first scan), then the 31 December goal countdown, stat tiles, fresh jobs, pipeline split, 14-day chart, follow-ups and quick actions. |
+| **Discover** (`/discover`) | Pick role titles, location and window (24h, 48h, week). **Web X-Ray** runs one search per ATS (Greenhouse, Ashby, Lever, SmartRecruiters, Workday) through the Serper or Brave search API with your key, and shows the results in the app: *Open* loads the posting in the Browser, *Add* saves and grills it. **In HunterOps** shows fresh matches the scanner already pulled. **People hiring** lists TA leaders. No Google pages are opened. |
+| **Pipeline** (`/pipeline`) | dnd-kit Kanban: **Scouted**, **Grilled 75+**, **Applied** (with Applied / Interview / Offer sub-stages) and **Rejected**. Drag on a laptop; on iPhone use the *Move to…* menu. |
+| **Browser** (`/browser`, `/browser/[jobId]`) | The posting is fetched by the server (an SSRF-guarded proxy) and shown as a sanitized **Reader** view, the **Live page** when the site allows framing, or Greenhouse's official **Apply form**. The control panel on the right has **Analyze** (Grill this page), **Auto-fill** (an answer for every field on the application form from your profile, with AI for open questions, each with a copy button), **Resume** and **Cover letter**. You submit the form yourself. |
+| **Mailroom** (`/mailroom`) | **Emails** (any job, or type a company), **LinkedIn & referrals** (three scripts under 60 words), **Gap scripts**, **Follow-ups** (log with 5-day reminders) and **Plain English** (ASD-STE100 rewrite). |
+| **Job page** (`/jobs/[id]`) | Grill card (radial gauge, the four dimensions, missing keywords as red badges, *Generate resume*), status and notes, and tabs for Description, Resume, Cover letter (AIDA or PAS), Email and Slop check. |
+| **Profile** / **Settings** | CV import, pay and notice period, location rules, CV roaster. Theme, AI provider, Gmail, web search key, extra banned words, feed keywords, company boards. |
+
+Other sites' application forms can't be filled from another site's page (browsers block that), and HunterOps never submits for you. Auto-fill gives you every answer ready to copy instead.
 
 ## The intelligence modules
 
-All three live in `src/lib/modules/` and are plain TypeScript with no AI call, so they are fast, free and give the same answer every time.
+All in `src/lib/`. The Grill, Anti-Slop scan and Designer audit are plain TypeScript with no AI call.
 
-### Module A: Anti-Slop (`anti-slop.ts`)
-`BANNED_PHRASES` holds the 16 phrases you specified (delve, testament to, game-changer, landscape, fostering, tapestry, plethora, underscores, paramount, spearheaded, unwavering, digital age, meticulous, navigating, poised to, rich history). Each rule also catches other forms ("delved", "spearheading", "game changer") and skips look-alikes ("landscaped").
-1. Every writing prompt (resume tailoring, emails) tells the model not to use them.
-2. Every draft is scanned; if anything slips through, the draft goes back to the model once for a rewrite.
-3. Whatever remains is highlighted in the app with a plainer word, and you can paste any text into the Slop check tab.
+### Module A: Anti-Slop (`modules/anti-slop.ts`, `writer.ts`)
+`BANNED_PHRASES` plus any extra words you add in Settings. `scanForSlop(text)` returns `{ hasSlop, findings }`. Every AI draft goes through `writeClean`: draft, one rewrite if a banned phrase slipped in, safe word swaps, and if anything still remains the draft is rejected with *"Draft rejected due to low-quality AI patterns: …"* instead of being shown.
 
-### Module D: The Grill (`grill.ts`)
+### Module B: Email generator (`email-generator.ts`)
+`SYSTEM_PROMPTS.AIDA` and `SYSTEM_PROMPTS.PAS`, picked by the `framework` parameter. `POST /api/draft-email { jobId, framework }` writes a cover letter, runs it through Anti-Slop and saves it on the job's `Artifact` row (and as an email draft when you give a recipient).
+
+### Module C: Plain English (`ste100.ts`)
+`refineToPlainEnglish(text)` sends: *"Rewrite the following text adhering to ASD-STE100 Simplified Technical English rules. One idea per sentence. Use active voice. Remove all jargon."* `POST /api/refine`.
+
+### Module D: The Grill (`modules/grill.ts`)
 | Part | Weight | How it is scored |
 | --- | --- | --- |
-| Skills match | 40 | Skills named in the JD's required part (from a recruiting-heavy vocabulary plus your own skills), and the share of them in your Profile skills. Whole-term matching ("java" never matches "javascript") with aliases ("TA" = "talent acquisition"). |
-| Location fit | 20 | Strict. Remote: full marks only if you accept remote and the role is open to India (a "Remote - US" role scores 0). Hybrid or on-site: full marks only in one of your cities. 10 if the posting does not say. |
-| Experience | 20 | Reads "5+ years", "3-6 yrs", "minimum of 8 years". Full marks at or above the minimum, partial credit down to half the minimum, slightly less if you are far above a stated band. |
-| Keywords | 20 | Bonus for the JD's "nice to have" / "preferred" / "a plus" items found anywhere in your profile. If the JD has no such list, the whole JD is used. |
+| Hard skills | 40 | 30 for the JD's required skills found in your profile, 10 for nice-to-haves. Whole-term matching with aliases; naming any ATS counts as ATS experience. |
+| Years of experience | 20 | Reads "5+ years", "3-6 yrs". Full marks at or above the minimum. |
+| Location fit | 20 | Strict: remote only if open to India; hybrid or on-site only in your cities. |
+| Salary fit | 20 | Pay read from the posting (LPA, lakh, crore, USD and monthly figures converted) against your expected CTC. Half marks when either is missing. |
 
-Scores are stored on each job with the full breakdown, recomputed when you save your profile or press Re-grill.
+The full result (score, band, each dimension, `missingKeywords`) is saved as JSON on the job. `POST /api/grill { url }` scores any link; `{ jobId }` re-reads and re-scores a saved job.
 
-### Module E: The Designer (`designer.ts` + [`DESIGN.md`](DESIGN.md))
-`DESIGN.md` is the Switzerland Style contract: Inter for headings and text, Roboto Mono for metadata, a 4px baseline grid, three colours (#111111, #FFFFFF, #E5E5E5), single column, 24mm margins. `designer.ts` holds the same values as tokens. The dashboard's Tailwind theme and the PDF/DOCX renderer both read them, and every tailored resume is audited against them (grid alignment, section order, page count for your years, bullet length and count) before you download it.
+### Module E: The Designer (`modules/designer.ts` + [`DESIGN.md`](DESIGN.md))
+`validateLayout(stats)` checks page overflow, heading hierarchy (section order), margins and the 4px grid; every tailored resume is checked before download.
 
 ## AI providers (pluggable)
 
@@ -62,7 +68,7 @@ Scores are stored on each job with the full breakdown, recomputed when you save 
 
 ## Data model
 
-`prisma/schema.prisma`: `Profile` (one row), `Company` (boards to scan), `Job` (feed and tracker in one table, with `grillScore` and `grillBreakdown`), `Resume` (tailored copies, with their Anti-Slop score), `Contact`, `Email` (DRAFT → APPROVED → SENT or FAILED), `Outreach` (LinkedIn DMs and referral asks you send yourself, with follow-up dates), `ScanRun`, `Setting`. Migrations are in `prisma/migrations` and run on every Vercel build.
+`prisma/schema.prisma`: `Profile` (one row), `Company` (boards to scan), `Job` (feed and tracker in one table: `url`, `description`, `status`, `grillScore` and `grillBreakdown`), `Artifact` (per job: `coverLetterText`, `resumePdfPath`, `emailDrafts` JSON, Auto-fill answers), `Resume` (tailored copies, with their Anti-Slop score), `Contact`, `Email` (DRAFT → APPROVED → SENT or FAILED), `Outreach` (LinkedIn DMs and referral asks you send yourself, with follow-up dates), `ScanRun`, `Setting` (config, including the extra banned words). Migrations are in `prisma/migrations` and run on every Vercel build.
 
 ## Email safety
 
@@ -91,7 +97,7 @@ npm test          # unit tests: Anti-Slop, Grill, scanner, renderer + Designer a
 npm run e2e       # end to end (needs a throwaway Postgres in .env.e2e and Playwright)
 ```
 
-`npm run e2e` resets the database in `.env.e2e`, builds the app, starts a mock OpenAI-compatible model server and a local SMTP server, then runs 25 API checks (login, encrypted keys, PDF import, Grill bands, filters, tailoring with the Anti-Slop rewrite, PDF/DOCX download, approve-then-send, daily cap, cron auth) and an iPhone-size browser pass with screenshots. `.env.e2e` looks like:
+`npm run e2e` resets the database in `.env.e2e`, builds the app and starts stand-ins for the outside world (a mock OpenAI-compatible model, an SMTP sink, and a mock web with the Serper search API, Greenhouse and Lever job APIs and two careers pages). It then runs 44 API checks (login, encrypted keys, CV import, Grill bands and salary fit, Grill a URL, job import, the Browser proxy and sanitizer, Auto-fill, AIDA/PAS cover letters, plain English, banned words, in-app Discover, approve-then-send, daily cap, cron auth) and a browser pass at laptop width and iPhone size (sidebar, Discover, a real Kanban drag, Browser tools, Mailroom, dark theme, no sideways scroll) with screenshots. `.env.e2e` looks like:
 
 ```
 DATABASE_URL=postgresql://postgres:pg@localhost:5432/hunterops

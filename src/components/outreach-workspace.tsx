@@ -24,30 +24,7 @@ type Script = { kind: string; label: string; message: string; words: number; slo
 const KIND_ROLE: Record<string, string> = { head_of_ta: 'Head of TA', peer_referral: 'Peer recruiter', practice_head: 'Practice Head' };
 const CHANNELS = { linkedin_dm: 'LinkedIn DM', email: 'Email', referral: 'Referral', other: 'Other' } as const;
 
-export function OutreachWorkspace({ initialTab, log, job }: { initialTab: string; log: LogItem[]; job: { id: string; title: string; company: string } | null }) {
-  const router = useRouter();
-  const [tab, setTab] = useState(initialTab);
-  const due = log.filter((l) => l.status === 'sent' && l.followUpAt && new Date(l.followUpAt).getTime() < Date.now() + 86_400_000).length;
-  return (
-    <Tabs value={tab} onValueChange={(v) => { setTab(v); router.replace(`/outreach?tab=${v}${job ? `&jobId=${job.id}` : ''}`, { scroll: false }); }}>
-      <div className="scroll-x">
-        <TabsList>
-          <TabsTrigger value="write"><PenLine /> Write</TabsTrigger>
-          <TabsTrigger value="gap"><ShieldQuestion /> Gap scripts</TabsTrigger>
-          <TabsTrigger value="log">
-            <History /> Log
-            {due > 0 && <span className="ml-1 rounded-full bg-warning px-1.5 text-[10px] font-bold text-background">{due}</span>}
-          </TabsTrigger>
-        </TabsList>
-      </div>
-      <TabsContent value="write"><Writer job={job} onLogged={() => router.refresh()} /></TabsContent>
-      <TabsContent value="gap"><GapScripts /></TabsContent>
-      <TabsContent value="log"><Log items={log} /></TabsContent>
-    </Tabs>
-  );
-}
-
-function Writer({ job, onLogged }: { job: { id: string; title: string; company: string } | null; onLogged: () => void }) {
+export function Writer({ job, onLogged }: { job: { id: string; title: string; company: string } | null; onLogged: () => void }) {
   const [f, setF] = useState({ company: job?.company ?? '', role: job?.title ?? '', recipientName: '', recipientTitle: '', req: '' });
   const [scripts, setScripts] = useState<Script[]>([]);
   const [busy, setBusy] = useState(false);
@@ -161,7 +138,7 @@ function ScriptCard({ s, company, recipientName, jobId, onLogged }: { s: Script;
   );
 }
 
-function GapScripts() {
+export function GapScripts() {
   const [since, setSince] = useState('November 2025');
   const [reason, setReason] = useState('');
   const [out, setOut] = useState<{ email: string; phone: string } | null>(null);
@@ -231,7 +208,7 @@ function ScriptBlock({ icon, title, text }: { icon: typeof Mail; title: string; 
   );
 }
 
-function Log({ items }: { items: LogItem[] }) {
+export function Log({ items }: { items: LogItem[] }) {
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'due' | 'sent' | 'replied' | 'drafted'>('all');
   const [busy, setBusy] = useState('');

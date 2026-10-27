@@ -14,15 +14,16 @@ import { scanSlop } from '@/lib/modules/anti-slop';
 
 export type EmailRow = {
   id: string; toEmail: string; subject: string; body: string; status: string; kind: string; framework: string;
-  error: string | null; sentAt: string | null; createdAt: string;
+  error: string | null; sentAt: string | null; createdAt: string; job?: { id: string; title: string; company: string } | null;
 };
+type JobOption = { id: string; title: string; company: string };
 
-const KINDS = { cold: 'Cold email', referral: 'Referral ask', follow_up: 'Follow-up', thank_you: 'Thank you' };
-const FRAMEWORKS = { plain: 'Plain', aida: 'AIDA', pas: 'PAS' };
+const KINDS = { cold: 'Cold email', referral: 'Referral ask', follow_up: 'Follow-up', thank_you: 'Thank you', cover_letter: 'Cover letter' };
+const FRAMEWORKS = { aida: 'AIDA (Attention, Interest, Desire, Action)', pas: 'PAS (Problem, Agitation, Solution)', plain: 'Plain' };
 
 function Select({ value, onChange, options, id }: { value: string; onChange: (v: string) => void; options: Record<string, string>; id: string }) {
   return (
-    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-full rounded-lg border bg-card px-3">
+    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
       {Object.entries(options).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
     </select>
   );
@@ -65,6 +66,19 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
     }
   }
 
+  async function plain() {
+    setBusy(true);
+    setErr('');
+    try {
+      const out = await api<{ text: string }>('/api/refine', { method: 'POST', json: { text: body } });
+      setBody(out.text);
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove() {
     setBusy(true);
     try {
@@ -79,7 +93,7 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
   return (
     <div className="surface flex flex-col gap-3 p-4" data-testid="email-draft">
       <div className="flex items-center justify-between gap-2">
-        <span className="meta">{KINDS[email.kind as keyof typeof KINDS] ?? email.kind} · {FRAMEWORKS[email.framework as keyof typeof FRAMEWORKS] ?? email.framework}</span>
+        <span className="meta truncate">{KINDS[email.kind as keyof typeof KINDS] ?? email.kind} · {(FRAMEWORKS[email.framework as keyof typeof FRAMEWORKS] ?? email.framework).split(' ')[0]}{email.job ? ` · ${email.job.company}` : ''}</span>
         <Badge variant={sent ? 'default' : 'outline'}>{email.status.toLowerCase()}</Badge>
       </div>
       {sent ? (
@@ -120,6 +134,7 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
                 </DialogContent>
               </Dialog>
             )}
+            <Button size="sm" variant="outline" onClick={plain} disabled={busy} title="Rewrite in ASD-STE100 plain English">Plain English</Button>
             <Button size="sm" variant="ghost" onClick={remove} disabled={busy}>Delete</Button>
           </div>
         </>
@@ -130,20 +145,26 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
   );
 }
 
-export function EmailPanel({ jobId, initial }: { jobId: string; initial: EmailRow[] }) {
+// Compose and manage recruiter emails: for one job (job page) or any job or
+// company (Mailroom, where `jobs` lists the pipeline to pick from).
+export function EmailPanel({ jobId, initial, jobs }: { jobId?: string; initial: EmailRow[]; jobs?: JobOption[] }) {
   const [emails, setEmails] = useState(initial);
-  const [form, setForm] = useState({ toEmail: '', recipientName: '', recipientTitle: '', kind: 'cold', framework: 'plain' });
+  const [form, setForm] = useState({ jobId: jobId ?? '', company: '', role: '', toEmail: '', recipientName: '', recipientTitle: '', kind: 'cold', framework: 'aida' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [filter, setFilter] = useState<'all' | 'DRAFT' | 'SENT'>('all');
   const set = (k: keyof typeof form) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const picker = !jobId && jobs;
 
   async function draft(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErr('');
     try {
-      const { email } = await api<{ email: EmailRow }>('/api/emails', { method: 'POST', json: { jobId, ...form } });
-      setEmails((list) => [email, ...list]);
+      const { jobId: jid, company, role, ...rest } = form;
+      const { email } = await api<{ email: EmailRow }>('/api/emails', { method: 'POST', json: jid ? { jobId: jid, ...rest } : { company, role, ...rest } });
+      const job = jobs?.find((j) => j.id === jid) ?? null;
+      setEmails((list) => [{ ...email, job }, ...list]);
     } catch (e2) {
       setErr((e2 as Error).message);
     } finally {
@@ -151,10 +172,33 @@ export function EmailPanel({ jobId, initial }: { jobId: string; initial: EmailRo
     }
   }
 
+  const shown = emails.filter((e) => filter === 'all' || (filter === 'SENT' ? e.status === 'SENT' : e.status !== 'SENT'));
   return (
-    <div className="flex flex-col gap-4">
-      <form onSubmit={draft} className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <div className="flex flex-col gap-1 md:col-span-2">
+    <div className={picker ? 'grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]' : 'flex flex-col gap-4'}>
+      <form onSubmit={draft} className={picker ? 'surface flex flex-col gap-3 self-start p-4' : 'grid grid-cols-1 gap-3 md:grid-cols-2'} data-testid="email-compose">
+        {picker && <p className="text-sm font-semibold">New email</p>}
+        {picker && (
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="em-job">Job</Label>
+            <select id="em-job" value={form.jobId} onChange={(e) => set('jobId')(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <option value="">No job: type the company</option>
+              {jobs!.map((j) => <option key={j.id} value={j.id}>{j.company}: {j.title}</option>)}
+            </select>
+          </div>
+        )}
+        {picker && !form.jobId && (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="em-company">Company</Label>
+              <Input id="em-company" value={form.company} onChange={(e) => set('company')(e.target.value)} required />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="em-role">Role</Label>
+              <Input id="em-role" value={form.role} onChange={(e) => set('role')(e.target.value)} placeholder="Senior Recruiter" />
+            </div>
+          </div>
+        )}
+        <div className={picker ? 'flex flex-col gap-1' : 'flex flex-col gap-1 md:col-span-2'}>
           <Label htmlFor="to">Recruiter email</Label>
           <Input id="to" type="email" required value={form.toEmail} onChange={(e) => set('toEmail')(e.target.value)} placeholder="name@company.com" />
         </div>
@@ -174,12 +218,24 @@ export function EmailPanel({ jobId, initial }: { jobId: string; initial: EmailRo
           <Label htmlFor="fw">Structure</Label>
           <Select id="fw" value={form.framework} onChange={set('framework')} options={FRAMEWORKS} />
         </div>
-        <Button type="submit" disabled={busy} className="md:col-span-2">{busy ? 'Writing…' : 'Write draft'}</Button>
+        <Button type="submit" disabled={busy} className={picker ? '' : 'md:col-span-2'}>{busy ? 'Writing…' : 'Write draft'}</Button>
+        {err && <p className="text-sm text-destructive md:col-span-2" role="alert">{err}</p>}
       </form>
-      {err && <p className="text-sm text-destructive" role="alert">{err}</p>}
-      {emails.map((e) => (
-        <Draft key={e.id} email={e} onChange={(next) => setEmails((list) => (next ? list.map((x) => (x.id === e.id ? next : x)) : list.filter((x) => x.id !== e.id)))} />
-      ))}
+      <div className="flex min-w-0 flex-col gap-3">
+        {picker && (
+          <div className="flex items-center gap-1.5">
+            {(['all', 'DRAFT', 'SENT'] as const).map((f) => (
+              <button key={f} type="button" className="chip" data-on={filter === f} onClick={() => setFilter(f)}>
+                {f === 'all' ? 'All' : f === 'DRAFT' ? 'Drafts' : 'Sent'} <span className="opacity-70">{emails.filter((e) => f === 'all' || (f === 'SENT' ? e.status === 'SENT' : e.status !== 'SENT')).length}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {shown.map((e) => (
+          <Draft key={e.id} email={e} onChange={(next) => setEmails((list) => (next ? list.map((x) => (x.id === e.id ? { ...next, job: e.job } : x)) : list.filter((x) => x.id !== e.id)))} />
+        ))}
+        {picker && !shown.length && <p className="rounded-lg border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">No emails yet. Write one on the left; nothing is sent until you approve it.</p>}
+      </div>
     </div>
   );
 }

@@ -1,11 +1,16 @@
 import Link from 'next/link';
 import {
-  ArrowRight, BellRing, Bookmark, Briefcase, CalendarClock, Columns3, Flame, Handshake, MessageSquareText, Radar, Send, Sparkles, Target, Trophy, UserRound,
+  ArrowRight, BellRing, Globe, Bookmark, Briefcase, CalendarClock, Columns3, Flame, Handshake, MessageSquareText, Radar, Send, Sparkles, Target, Trophy, UserRound,
 } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { EmptyState, IconChip, PageHeader, Pill, Section, StatTile } from '@/components/kit';
 import { GrillScoreBadge } from '@/components/grill-score-badge';
 import { ScanButton } from '@/components/scan-button';
+import { SetupCard } from '@/components/setup-card';
+import { loadProfile, profileIsEmpty } from '@/lib/profile';
+import { loadSettings } from '@/lib/settings';
+import { searchConfig } from '@/lib/websearch';
+import { PROVIDERS, type ProviderId } from '@/lib/llm/providers';
 import { cn, timeAgo } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -21,13 +26,14 @@ function istDayKey(d: Date) {
 export default async function Dashboard() {
   const now = new Date();
   const since14 = new Date(now.getTime() - 13 * DAY);
-  const [counts, profile, fresh, followUps, staleApplied, appliedDates, sentDates, lastRun, outreachCount] = await Promise.all([
+  const [counts, profile, settings, fresh, followUps, staleApplied, appliedDates, sentDates, lastRun, outreachCount] = await Promise.all([
     prisma.job.groupBy({ by: ['status'], _count: true }),
-    prisma.profile.findFirst({ select: { name: true, skills: true } }),
+    loadProfile(),
+    loadSettings(),
     prisma.job.findMany({
       where: { status: 'NEW', firstSeenAt: { gte: new Date(now.getTime() - DAY) } },
       orderBy: [{ grillScore: { sort: 'desc', nulls: 'last' } }, { firstSeenAt: 'desc' }],
-      take: 5,
+      take: 6,
       select: { id: true, title: true, company: true, location: true, grillScore: true, firstSeenAt: true, postedAt: true, source: true },
     }),
     prisma.outreach.findMany({
@@ -73,51 +79,47 @@ export default async function Dashboard() {
   ];
   const pipeTotal = Math.max(1, pipeline.reduce((a, p) => a + p.value, 0));
   const nudges = followUps.length + staleApplied.length;
+  const provider = (settings.get('llm_provider') || 'opencode') as ProviderId;
+  const providerDef = PROVIDERS[provider];
+  const steps = [
+    { id: 'cv', title: 'Upload your CV', sub: 'Fills your profile and scores every job against it.', done: !profileIsEmpty(profile) },
+    { id: 'ai', title: `Connect the AI (${providerDef?.label ?? provider})`, sub: 'Writes resumes, cover letters, emails and Auto-fill answers.', done: Boolean(settings.get(`llm_key_${provider}`)) || Boolean(providerDef && 'keyOptional' in providerDef && providerDef.keyOptional) },
+    { id: 'prefs', title: 'Add expected CTC and notice period', sub: 'Used by the Grill salary score and Auto-fill.', done: Boolean(profile?.expectedSalaryLpa && profile?.noticePeriod) },
+    { id: 'search', title: 'Add a web search key', sub: 'Shows X-Ray results from all five ATS sites inside Discover.', done: Boolean(searchConfig(settings)), optional: true },
+    { id: 'scan', title: 'Run your first scan', sub: 'Pulls fresh openings from 50+ company boards and job sites.', done: Boolean(lastRun) },
+  ];
+  const setupDone = steps.every((s) => s.done || s.optional);
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="hero-glow -mx-4 -mt-5 px-4 pb-2 pt-5 md:-mx-8 md:-mt-8 md:rounded-b-3xl md:px-8 md:pt-8">
-        <PageHeader
-          eyebrow={now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
-          title={`${greet}${firstName ? `, ${firstName}` : ''}`}
-          sub={lastRun ? <>Last scan {timeAgo(lastRun.startedAt)} · {lastRun.inserted ?? 0} new jobs</> : 'No scans yet. Run your first scan to fill the board.'}
-          action={<ScanButton />}
-        />
-        <div className="mt-5 grid grid-cols-[auto_1fr] items-center gap-4 rounded-2xl border bg-card/70 p-4 backdrop-blur">
-          <div className="grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-primary to-info text-primary-foreground">
-            <div className="text-center">
-              <div className="text-2xl font-extrabold leading-none tabular-nums">{daysLeft}</div>
-              <div className="mt-0.5 text-[9px] font-bold uppercase tracking-wider">days</div>
-            </div>
-          </div>
-          <div className="min-w-0">
-            <p className="font-semibold leading-6">to your 31 December offer goal</p>
-            <p className="text-sm leading-5 text-muted-foreground">
-              {weekTotal} applications and messages in the last 7 days. Aim for 15 or more a week.
-            </p>
-            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-gradient-to-r from-primary to-info" style={{ width: `${Math.min(100, Math.round((weekTotal / 15) * 100))}%` }} />
-            </div>
+      <PageHeader
+        eyebrow={now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
+        title={`${greet}${firstName ? `, ${firstName}` : ''}`}
+        sub={lastRun ? <>Last scan {timeAgo(lastRun.startedAt)} · {lastRun.inserted ?? 0} new jobs</> : 'No scans yet.'}
+        action={<ScanButton />}
+      />
+
+      {!setupDone && <SetupCard steps={steps} />}
+
+      <div className="surface flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:gap-6">
+        <div className="flex items-baseline gap-2">
+          <span className="text-4xl font-semibold tabular-nums tracking-tight">{daysLeft}</span>
+          <span className="text-sm text-muted-foreground">days</span>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium">to your 31 December offer goal</p>
+          <p className="text-sm text-muted-foreground">{weekTotal} applications and messages in the last 7 days. Aim for 15 or more a week.</p>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, Math.round((weekTotal / 15) * 100))}%` }} />
           </div>
         </div>
       </div>
-
-      {!profile && (
-        <Link href="/profile" className="surface flex items-center gap-3 border-primary/40 p-4">
-          <IconChip icon={UserRound} />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">Import your resume first</p>
-            <p className="text-sm text-muted-foreground">Grill Scores, tailored resumes and messages all read from it.</p>
-          </div>
-          <ArrowRight className="h-4 w-4 text-muted-foreground" />
-        </Link>
-      )}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatTile label="New jobs" value={n(['NEW'])} hint={`${fresh.length} in the last 24h`} icon={Flame} tone="danger" href="/jobs?view=new" />
         <StatTile label="Applied" value={n(['APPLIED', 'INTERVIEW', 'OFFER'])} hint="all time" icon={Send} tone="primary" href="/pipeline" />
         <StatTile label="Interviews" value={n(['INTERVIEW'])} hint={n(['OFFER']) ? `${n(['OFFER'])} offer${n(['OFFER']) > 1 ? 's' : ''}` : 'keep going'} icon={Trophy} tone="warning" href="/pipeline" />
-        <StatTile label="Outreach sent" value={outreachCount} hint={nudges ? `${nudges} follow-up${nudges > 1 ? 's' : ''} due` : 'none due'} icon={MessageSquareText} tone="info" href="/outreach?tab=log" />
+        <StatTile label="Outreach sent" value={outreachCount} hint={nudges ? `${nudges} follow-up${nudges > 1 ? 's' : ''} due` : 'none due'} icon={MessageSquareText} tone="info" href="/mailroom?tab=log" />
       </div>
 
       <div className="grid gap-8 md:grid-cols-[1.4fr_1fr]">
@@ -125,7 +127,7 @@ export default async function Dashboard() {
           {fresh.length ? (
             <div className="surface divide-y overflow-hidden">
               {fresh.map((j) => (
-                <Link key={j.id} href={`/jobs/${j.id}`} className="flex items-center gap-3 p-3 transition-colors hover:bg-accent/60">
+                <Link key={j.id} href={`/browser/${j.id}`} className="flex items-center gap-3 p-3 transition-colors hover:bg-accent/60">
                   <GrillScoreBadge score={j.grillScore} size="sm" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold leading-5">{j.title}</p>
@@ -136,8 +138,8 @@ export default async function Dashboard() {
               ))}
             </div>
           ) : (
-            <EmptyState icon={Radar} title="Nothing new today yet" action={<Link href="/discover" className="text-sm font-semibold text-primary">Run an X-Ray search</Link>}>
-              The scanner checks company boards every morning at 8:00. You can also scan now or search the ATS sites directly.
+            <EmptyState icon={Radar} title="Nothing new today yet" action={<Link href="/discover" className="text-sm font-semibold text-primary">Search in Discover</Link>}>
+              The scanner checks company boards every morning at 8:00. Press Scan now for a fresh check.
             </EmptyState>
           )}
         </Section>
@@ -183,7 +185,7 @@ export default async function Dashboard() {
         {nudges ? (
           <div className="surface divide-y overflow-hidden">
             {followUps.map((f) => (
-              <Link key={f.id} href="/outreach?tab=log" className="flex items-center gap-3 p-3 hover:bg-accent/60">
+              <Link key={f.id} href="/mailroom?tab=log" className="flex items-center gap-3 p-3 hover:bg-accent/60">
                 <IconChip icon={BellRing} tone="warning" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold leading-5">Follow up with {f.recipientName || f.recipientRole}</p>
@@ -211,14 +213,14 @@ export default async function Dashboard() {
       <Section title="Quick actions">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
-            { href: '/discover', icon: Radar, title: 'X-Ray search', sub: '5 ATS, last 24h', tone: 'primary' as const },
-            { href: '/outreach', icon: Handshake, title: 'Write outreach', sub: '3 scripts, under 60 words', tone: 'info' as const },
+            { href: '/discover', icon: Radar, title: 'Discover', sub: '5 ATS, last 24h', tone: 'primary' as const },
+            { href: '/browser', icon: Globe, title: 'Browser', sub: 'Open, grill, auto-fill', tone: 'info' as const },
+            { href: '/mailroom?tab=linkedin', icon: Handshake, title: 'Write outreach', sub: '3 scripts, under 60 words', tone: 'info' as const },
             { href: '/profile?tab=roast', icon: Sparkles, title: 'Roast my CV', sub: 'Duty to metric rewrite', tone: 'warning' as const },
             { href: '/pipeline', icon: Columns3, title: 'Pipeline', sub: 'Move jobs through stages', tone: 'success' as const },
             { href: '/jobs?view=saved', icon: Bookmark, title: 'Saved jobs', sub: `${n(['SAVED'])} waiting`, tone: 'muted' as const },
-            { href: '/outreach?tab=gap', icon: Target, title: 'Gap scripts', sub: 'Email and phone screen', tone: 'muted' as const },
-            { href: '/jobs', icon: Briefcase, title: 'Job board', sub: 'Grill-scored feed', tone: 'muted' as const },
-            { href: '/profile', icon: UserRound, title: 'Profile', sub: profile?.skills.length ? `${profile.skills.length} skills` : 'Import resume', tone: 'muted' as const },
+            { href: '/mailroom?tab=gap', icon: Target, title: 'Gap scripts', sub: 'Email and phone screen', tone: 'muted' as const },
+            { href: '/profile', icon: UserRound, title: 'Profile', sub: profile?.skills.length ? `${profile.skills.length} skills` : 'Upload your CV', tone: 'muted' as const },
           ].map((a) => (
             <Link key={a.href + a.title} href={a.href} className="surface flex flex-col gap-3 p-4 transition-colors hover:border-primary/40">
               <IconChip icon={a.icon} tone={a.tone} />

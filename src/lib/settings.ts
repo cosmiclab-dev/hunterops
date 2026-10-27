@@ -31,6 +31,9 @@ export const SETTINGS: Record<string, Def> = {
   },
   feed_exclude: { label: 'Exclude words', fallback: 'intern, internship, trainee, apprentice' },
   feed_locations: { label: 'Locations', fallback: 'bengaluru,remote_india,remote_global' },
+  banned_words_extra: { label: 'Extra banned words' },
+  search_provider: { label: 'Web search API', fallback: 'none' },
+  search_api_key: { label: 'Web search API key', secret: true, env: 'SEARCH_API_KEY' },
   boards_scanned_at: { label: 'Boards last scanned', internal: true },
 };
 

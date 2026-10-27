@@ -60,6 +60,7 @@ export const EMAIL_KINDS = {
   referral: 'A request to an employee at the company for a referral to a specific role. Make it easy: offer a 3-line blurb.',
   follow_up: 'A short, polite follow-up to an earlier email that got no reply. Add one new piece of value; no guilt-tripping.',
   thank_you: 'A thank-you note after an interview that reinforces one strong point from the conversation.',
+  cover_letter: 'A short cover letter sent as an email with the application: why this role, the two strongest matching proof points, and availability.',
 } as const;
 export type EmailKind = keyof typeof EMAIL_KINDS;
 
@@ -82,7 +83,7 @@ Structure: ${EMAIL_FRAMEWORKS[a.framework]}
 
 Rules:
 - Subject: under 8 words, specific (role or company name), no clickbait.
-- Body: under 120 words. Short paragraphs. One clear, small ask (a 10-minute call, a referral, the right contact).
+- Body: under ${a.kind === 'cover_letter' ? 200 : 120} words. Short paragraphs. One clear, small ask (a 10-minute call, a referral, the right contact).
 - Open with "Hi ${first}," and close with the candidate's first name only.
 - No "I hope this finds you well", no "I am writing to express", no emojis.
 - ${NO_FABRICATION}

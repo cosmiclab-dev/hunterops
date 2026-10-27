@@ -1,20 +1,21 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { HttpError, ok, readJson, route } from '@/lib/http';
-import { llmConfig } from '@/lib/llm/client';
 import { EMAIL_RE } from '@/lib/mailer';
-import { profileToText, requireProfile } from '@/lib/profile';
-import { EMAIL_FRAMEWORKS, EMAIL_KINDS, emailMessages } from '@/lib/prompts';
+import { requireProfile } from '@/lib/profile';
+import { EMAIL_FRAMEWORKS, EMAIL_KINDS } from '@/lib/prompts';
+import { generateEmail } from '@/lib/email-generator';
 import { loadSettings } from '@/lib/settings';
-import { writeClean } from '@/lib/writer';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// AI writing with thinking models: a draft plus one Anti-Slop rewrite can take minutes.
+export const maxDuration = 300;
 
 export const GET = route(async (req: Request) => {
   const jobId = new URL(req.url).searchParams.get('jobId');
   const emails = await prisma.email.findMany({
     where: jobId ? { jobId } : {},
+    include: { job: { select: { id: true, title: true, company: true } } },
     orderBy: { createdAt: 'desc' },
     take: 100,
   });
@@ -22,7 +23,9 @@ export const GET = route(async (req: Request) => {
 });
 
 const Draft = z.object({
-  jobId: z.string().uuid(),
+  jobId: z.string().uuid().optional(),
+  company: z.string().max(200).optional().default(''),
+  role: z.string().max(300).optional().default(''),
   kind: z.enum(Object.keys(EMAIL_KINDS) as [keyof typeof EMAIL_KINDS]).default('cold'),
   framework: z.enum(Object.keys(EMAIL_FRAMEWORKS) as [keyof typeof EMAIL_FRAMEWORKS]).default('plain'),
   toEmail: z.string().max(200).regex(EMAIL_RE, 'Enter a valid email address'),
@@ -30,41 +33,41 @@ const Draft = z.object({
   recipientTitle: z.string().max(120).optional().default(''),
 });
 
-// Writes a draft. Drafts are never sent from here: see /api/emails/[id]/send.
+// Writes a draft, for a job on the board or any company. Drafts are never sent
+// from here: see /api/emails/[id]/send.
 export const POST = route(async (req: Request) => {
   const body = Draft.parse(await readJson(req));
-  const job = await prisma.job.findUnique({ where: { id: body.jobId } });
-  if (!job) throw new HttpError(404, 'Job not found.');
+  const job = body.jobId ? await prisma.job.findUnique({ where: { id: body.jobId } }) : null;
+  if (body.jobId && !job) throw new HttpError(404, 'Job not found.');
+  const company = job?.company || body.company.trim();
+  if (!company) throw new HttpError(400, 'Pick a job or type the company name.');
   const profile = await requireProfile();
-  const settings = await loadSettings();
-  const previous = body.kind === 'follow_up'
+  const previous = body.kind === 'follow_up' && job
     ? (await prisma.email.findFirst({ where: { jobId: job.id, status: 'SENT' }, orderBy: { sentAt: 'desc' } }))?.body
     : undefined;
-  const out = await writeClean<{ subject?: string; body?: string }>(llmConfig(settings), emailMessages({
+  const out = await generateEmail(await loadSettings(), {
     kind: body.kind,
     framework: body.framework,
-    profileText: profileToText(profile),
-    company: job.company,
-    role: job.title,
-    jd: job.description ?? undefined,
+    profile,
+    company,
+    role: job?.title || body.role || undefined,
+    jd: job?.description ?? undefined,
     recipientName: body.recipientName,
     recipientTitle: body.recipientTitle,
     previous,
-  }), { maxTokens: 900, temperature: 0.5 });
-  const subject = String(out.data?.subject ?? '').trim().slice(0, 200);
-  const text = String(out.data?.body ?? '').trim().slice(0, 5000);
-  if (!subject || !text) throw new HttpError(502, 'The model returned an empty email. Try again.');
+  });
+  if (!out.subject || !out.body) throw new HttpError(502, 'The model returned an empty email. Try again.');
   let contactId: string | null = null;
   if (body.recipientName || body.recipientTitle) {
     const contact = await prisma.contact.create({
-      data: { company: job.company, name: body.recipientName || null, title: body.recipientTitle || null, email: body.toEmail, jobId: job.id },
+      data: { company, name: body.recipientName || null, title: body.recipientTitle || null, email: body.toEmail, jobId: job?.id ?? null },
     });
     contactId = contact.id;
   }
   const email = await prisma.email.create({
     data: {
-      jobId: job.id, contactId, kind: body.kind, framework: body.framework, toEmail: body.toEmail,
-      subject, body: text, slopScore: out.slop.score,
+      jobId: job?.id ?? null, contactId, kind: body.kind, framework: body.framework, toEmail: body.toEmail,
+      subject: out.subject, body: out.body, slopScore: out.slop.score,
     },
   });
   return ok({ email, slop: out.slop, model: out.model }, 201);

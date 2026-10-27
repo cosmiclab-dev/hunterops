@@ -27,21 +27,11 @@ export function JobStatus({ id, status, notes }: { id: string; status: string; n
     }
   }
 
-  async function regrill() {
-    setMsg('');
-    try {
-      await api(`/api/jobs/${id}/grill`, { method: 'POST' });
-      router.refresh();
-      setMsg('Re-grilled');
-    } catch (e) {
-      setMsg((e as Error).message);
-    }
-  }
-
   return (
     <div className="surface flex flex-col gap-3 p-4">
-      <div className="scroll-x">
-        <div className="inline-flex gap-1.5">
+      <p className="text-sm font-semibold">Status</p>
+      <div>
+        <div className="flex flex-wrap gap-1.5">
           {STATUSES.map((s) => (
             <button
               key={s}
@@ -55,11 +45,9 @@ export function JobStatus({ id, status, notes }: { id: string; status: string; n
           ))}
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">You apply on the company site yourself, then mark it Applied here.</p>
       <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} placeholder="Notes: referral, recruiter name, follow-up date" aria-label="Notes" />
       <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" onClick={() => save({ notes: text })}>Save notes</Button>
-        <Button size="sm" variant="ghost" onClick={regrill}>Re-grill</Button>
         {msg && <span className="meta" role="status">{msg}</span>}
       </div>
     </div>

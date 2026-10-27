@@ -6,11 +6,12 @@ import { profileToText, requireProfile } from '@/lib/profile';
 import { OUTREACH_KINDS, outreachMessages, type OutreachKind } from '@/lib/prompts';
 import { loadSettings } from '@/lib/settings';
 import { scanSlop } from '@/lib/modules/anti-slop';
-import { writeClean } from '@/lib/writer';
+import { extraBanned, writeClean } from '@/lib/writer';
 import { wordCount } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// AI writing with thinking models: a draft plus one Anti-Slop rewrite can take minutes.
+export const maxDuration = 300;
 
 
 export const GET = route(async (req: Request) => {
@@ -44,10 +45,11 @@ export const POST = route(async (req: Request) => {
     reqText ||= `${job.url}\n${(job.description || '').slice(0, 2500)}`;
   }
   const profile = await requireProfile();
-  const out = await writeClean<Record<string, string>>(llmConfig(await loadSettings()), outreachMessages({
+  const settings = await loadSettings();
+  const out = await writeClean<Record<string, string>>(llmConfig(settings), outreachMessages({
     company: body.company, role, req: reqText, recipientName: body.recipientName, recipientTitle: body.recipientTitle,
     profileText: profileToText(profile),
-  }), { maxTokens: 1000, temperature: 0.6 });
+  }), { maxTokens: 1000, temperature: 0.6, extra: extraBanned(settings) });
   const scripts = (Object.keys(OUTREACH_KINDS) as OutreachKind[]).map((kind) => {
     const message = String(out.data?.[kind] ?? '').trim().slice(0, 1500);
     return { kind, label: OUTREACH_KINDS[kind].label, message, words: wordCount(message), slop: scanSlop(message).score };
