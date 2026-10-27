@@ -5,7 +5,8 @@ import { chatJson, type ChatMessage, type LlmConfig } from './llm/client';
 import { rewriteRequest, scanSlop, textOf, type SlopReport } from './modules/anti-slop';
 
 export async function writeClean<T = any>(cfg: LlmConfig, messages: ChatMessage[], opts: { maxTokens?: number; temperature?: number } = {}) {
-  const first = await chatJson(cfg, messages, opts);
+  const session = crypto.randomUUID();
+  const first = await chatJson(cfg, messages, { ...opts, session });
   let data = first.data as T;
   let slop: SlopReport = scanSlop(textOf(data));
   let rewrites = 0;
@@ -15,7 +16,7 @@ export async function writeClean<T = any>(cfg: LlmConfig, messages: ChatMessage[
         ...messages,
         { role: 'assistant', content: first.content },
         { role: 'user', content: rewriteRequest(slop) },
-      ], opts);
+      ], { ...opts, session });
       const report = scanSlop(textOf(second.data));
       if (report.hits.length < slop.hits.length) {
         data = second.data as T;
