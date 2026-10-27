@@ -63,7 +63,14 @@ describe('provider layer', () => {
 
   it('maps auth errors to a plain message', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('no', { status: 401 }));
-    await expect(chat(llmConfig(settings({ llm_key_opencode: 'k' })), [{ role: 'user', content: 'u' }])).rejects.toThrow(/rejected the API key/);
+    await expect(chat(llmConfig(settings({ llm_key_opencode: 'k' })), [{ role: 'user', content: 'u' }])).rejects.toThrow(/Check the API key/);
+  });
+
+  it('shows the provider\'s own reason when it refuses a request', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('{"error":{"message":"Model requires the Global region"}}', { status: 400 }));
+    await expect(chat(llmConfig(settings({ llm_key_opencode: 'k' })), [{ role: 'user', content: 'u' }]))
+      .rejects.toThrow(/HTTP 400.*It said: "Model requires the Global region"/);
   });
 
   it('pulls JSON out of fenced or chatty replies', () => {
