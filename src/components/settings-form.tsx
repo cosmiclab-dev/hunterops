@@ -55,7 +55,7 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
   });
   const [feedMsg, setFeedMsg] = useState({ msg: '', err: '' });
 
-  const [search, setSearch] = useState({ provider: initial.search_provider.value && initial.search_provider.value !== 'none' ? initial.search_provider.value : 'serper', key: '' });
+  const [search, setSearch] = useState({ provider: initial.search_provider.value && initial.search_provider.value !== 'none' ? initial.search_provider.value : 'free', key: '' });
   const [searchMsg, setSearchMsg] = useState({ msg: '', err: '' });
   const [banned, setBanned] = useState(initial.banned_words_extra.value || '');
   const [bannedMsg, setBannedMsg] = useState({ msg: '', err: '' });
@@ -272,21 +272,24 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
 
       <Section title="Web search (Discover)" id="search">
         <p className="text-sm leading-6 text-muted-foreground">
-          Discover runs X-Ray searches of Greenhouse, Lever, Ashby, SmartRecruiters and Workday through a search API, so results open inside HunterOps.
-          Easiest: create a free key at <a className="font-medium text-foreground underline" href="https://serper.dev" target="_blank" rel="noopener noreferrer">serper.dev</a> (Google results, 2,500 free searches, no card).
+          Discover searches Greenhouse, Lever, Ashby, SmartRecruiters and Workday for fresh postings and shows them inside HunterOps.
+          The free option needs no key: it reads Bing&apos;s public results, then DuckDuckGo. A key is optional and only gives steadier results.
         </p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="sprov">Search API</Label>
+            <Label htmlFor="sprov">Search source</Label>
             <select id="sprov" value={search.provider} onChange={(e) => setSearch({ ...search, provider: e.target.value })} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
-              <option value="serper">Serper (Google results)</option>
-              <option value="brave">Brave Search API</option>
+              <option value="free">Free: Bing + DuckDuckGo (no key)</option>
+              <option value="serper">Serper (Google results, key)</option>
+              <option value="brave">Brave Search API (key)</option>
             </select>
           </div>
-          <div className="flex flex-col gap-1">
-            <Label htmlFor="skey">API key</Label>
-            <Input id="skey" type="password" autoComplete="off" value={search.key} onChange={(e) => setSearch({ ...search, key: e.target.value })} placeholder={s.search_api_key.hint ? `Saved: ${s.search_api_key.hint}` : 'Paste key'} />
-          </div>
+          {search.provider !== 'free' && (
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="skey">API key</Label>
+              <Input id="skey" type="password" autoComplete="off" value={search.key} onChange={(e) => setSearch({ ...search, key: e.target.value })} placeholder={s.search_api_key.hint ? `Saved: ${s.search_api_key.hint}` : 'Paste key'} />
+            </div>
+          )}
         </div>
         <Button className="self-start" onClick={saveSearch}>Save</Button>
         <Status {...searchMsg} />

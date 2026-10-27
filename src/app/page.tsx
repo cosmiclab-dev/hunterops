@@ -9,7 +9,6 @@ import { ScanButton } from '@/components/scan-button';
 import { SetupCard } from '@/components/setup-card';
 import { loadProfile, profileIsEmpty } from '@/lib/profile';
 import { loadSettings } from '@/lib/settings';
-import { searchConfig } from '@/lib/websearch';
 import { PROVIDERS, type ProviderId } from '@/lib/llm/providers';
 import { cn, timeAgo } from '@/lib/utils';
 
@@ -85,10 +84,9 @@ export default async function Dashboard() {
     { id: 'cv', title: 'Upload your CV', sub: 'Fills your profile and scores every job against it.', done: !profileIsEmpty(profile) },
     { id: 'ai', title: `Connect the AI (${providerDef?.label ?? provider})`, sub: 'Writes resumes, cover letters, emails and Auto-fill answers.', done: Boolean(settings.get(`llm_key_${provider}`)) || Boolean(providerDef && 'keyOptional' in providerDef && providerDef.keyOptional) },
     { id: 'prefs', title: 'Add expected CTC and notice period', sub: 'Used by the Grill salary score and Auto-fill.', done: Boolean(profile?.expectedSalaryLpa && profile?.noticePeriod) },
-    { id: 'search', title: 'Add a web search key', sub: 'Shows X-Ray results from all five ATS sites inside Discover.', done: Boolean(searchConfig(settings)), optional: true },
     { id: 'scan', title: 'Run your first scan', sub: 'Pulls fresh openings from 50+ company boards and job sites.', done: Boolean(lastRun) },
   ];
-  const setupDone = steps.every((s) => s.done || s.optional);
+  const setupDone = steps.every((s) => s.done);
 
   return (
     <div className="flex flex-col gap-8">
