@@ -10,66 +10,67 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Two themes on one set of tokens. Light keeps DESIGN.md's Swiss base
-   (#111111 ink, white cards, #E5E5E5 rules); dark is the operational
-   "command center" look. The <html> element gets .dark from the theme
+/* Two themes on one set of tokens, after Apple's system colours: grey page,
+   white cards, ink buttons, muted status colours. The <html> element gets .dark from the theme
    script in layout.tsx (system setting by default, or the Settings toggle). */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    /* Apple-like neutrals: system gray backgrounds, near-black ink, one muted
+       blue for focus and links. No purple anywhere. */
+    --background: 240 6% 97%;          /* #F5F5F7 */
+    --foreground: 240 3% 11%;          /* #1D1D1F */
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 240 3% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 243 75% 59%;
+    --popover-foreground: 240 3% 11%;
+    --primary: 240 3% 11%;             /* buttons are ink, not colour */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 72% 51%;
+    --secondary: 240 5% 93%;
+    --secondary-foreground: 240 3% 11%;
+    --muted: 240 5% 94%;
+    --muted-foreground: 240 2% 44%;    /* #6E6E73 */
+    --accent: 240 5% 92%;
+    --accent-foreground: 240 3% 11%;
+    --destructive: 356 72% 45%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 72% 32%;
-    --warning: 32 95% 44%;
-    --info: 199 89% 40%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 88%;
-    --ring: 243 75% 59%;
-    --radius: 8px;
-    --shadow: 0 1px 2px rgb(9 9 11 / 0.05);
-    --sidebar: 240 4.8% 97.5%;
-    --glow: 243 75% 59%;
+    --success: 140 45% 34%;
+    --warning: 30 80% 38%;
+    --info: 211 70% 42%;
+    --border: 240 6% 89%;              /* #E5E5EA */
+    --input: 240 6% 86%;
+    --ring: 211 70% 50%;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.02);
+    --sidebar: 240 6% 95%;
+    --glow: 211 70% 50%;
     color-scheme: light;
   }
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 8% 6%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 8% 6%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 239 84% 70%;
-    --primary-foreground: 240 10% 3.9%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 13%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 72% 58%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 96%;
+    --card: 240 3% 11%;                /* #1C1C1E */
+    --card-foreground: 0 0% 96%;
+    --popover: 240 3% 11%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 0 0% 96%;
+    --primary-foreground: 240 3% 11%;
+    --secondary: 240 3% 17%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 240 3% 15%;
+    --muted-foreground: 240 3% 62%;
+    --accent: 240 3% 18%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 356 75% 60%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 69% 50%;
-    --warning: 38 92% 56%;
-    --info: 199 89% 60%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 19%;
-    --ring: 239 84% 70%;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.4);
-    --sidebar: 240 8% 5%;
-    --glow: 239 84% 70%;
+    --success: 140 40% 55%;
+    --warning: 35 75% 58%;
+    --info: 211 75% 64%;
+    --border: 240 3% 20%;
+    --input: 240 3% 24%;
+    --ring: 211 75% 64%;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.5);
+    --sidebar: 240 3% 7%;
+    --glow: 211 75% 64%;
     color-scheme: dark;
   }
   * { @apply border-border; }
@@ -84,10 +85,10 @@
 }
 
 @layer components {
-  .meta { @apply font-mono text-xs leading-4 text-muted-foreground; }
-  .label-caps { @apply font-mono text-[11px] font-medium uppercase tracking-[0.08em] leading-4; }
+  .meta { @apply text-xs leading-4 text-muted-foreground; }
+  .label-caps { @apply text-xs font-medium leading-4; }
   .surface { @apply rounded-xl border bg-card text-card-foreground; box-shadow: var(--shadow); }
-  .page-title { @apply text-2xl font-semibold leading-8 tracking-tight; }
+  .page-title { @apply text-[28px] font-semibold leading-9 tracking-[-0.02em]; }
   .section-title { @apply label-caps text-muted-foreground; }
   .chip {
     @apply inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3 text-xs font-medium transition-colors;

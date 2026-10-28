@@ -77,7 +77,6 @@ export default async function JobBoard({ searchParams }: { searchParams: Search 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Grill-scored feed"
         title="Jobs"
         sub={lastRun ? `Last scan ${lastRun.startedAt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}` : 'No scans yet'}
         action={<ScanButton />}

@@ -16,12 +16,32 @@ const EMPTY: ProfileInput = {
   skills: [], experience: [], education: [], certifications: [], achievements: [],
   yearsExperience: null, acceptRemote: true, acceptHybrid: true, onsiteCities: ['Bengaluru'],
   expectedSalaryLpa: null, currentCtcLpa: null, noticePeriod: '',
+  targetRoles: [], dealbreakers: [], companyTypes: [], languages: [],
 };
+
+const COMPANY_TYPES = { gcc: 'GCC / MNC capability centre', product: 'Product company or startup', enterprise: 'Indian enterprise', services: 'IT services / consulting', staffing: 'Staffing or RPO firm' } as const;
+
+const SECTIONS = [['basics', 'Basics'], ['goals', 'What you want'], ['pay', 'Pay and notice'], ['where', 'Where you work'], ['skills', 'Skills and summary'], ['experience', 'Experience'], ['education', 'Education']] as const;
 
 const lines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean);
 
-function Field({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
-  return <div className="flex flex-col gap-1"><Label htmlFor={id}>{label}</Label>{children}</div>;
+function Field({ label, id, hint, children }: { label: string; id: string; hint?: string; children: React.ReactNode }) {
+  return <div className="flex flex-col gap-1"><Label htmlFor={id}>{label}</Label>{children}{hint && <p className="meta">{hint}</p>}</div>;
+}
+
+function Card({ id, title, desc, action, className = '', children }: { id: string; title: string; desc?: string; action?: React.ReactNode; className?: string; children: React.ReactNode }) {
+  return (
+    <section id={`p-${id}`} className="surface flex scroll-mt-24 flex-col gap-4 p-4 md:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-[15px] font-semibold">{title}</h2>
+          {desc && <p className="mt-1 text-sm leading-6 text-muted-foreground">{desc}</p>}
+        </div>
+        {action}
+      </div>
+      <div className={className || 'flex flex-col gap-4'}>{children}</div>
+    </section>
+  );
 }
 
 export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
@@ -29,6 +49,7 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
   const [p, setP] = useState<ProfileInput>(initial ?? EMPTY);
   const [skillsText, setSkillsText] = useState((initial?.skills ?? []).join(', '));
   const [citiesText, setCitiesText] = useState((initial?.onsiteCities ?? ['Bengaluru']).join(', '));
+  const [langsText, setLangsText] = useState((initial?.languages ?? []).join(', '));
   const [busy, setBusy] = useState('');
   // Bumped when lists are replaced wholesale, so uncontrolled textareas remount.
   const [rev, setRev] = useState(0);
@@ -66,12 +87,14 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
         ...p,
         skills: skillsText.split(',').map((s) => s.trim()).filter(Boolean),
         onsiteCities: citiesText.split(',').map((s) => s.trim()).filter(Boolean),
+        languages: langsText.split(',').map((s) => s.trim()).filter(Boolean),
       };
       const out = await api<{ profile: ProfileInput; grilled: number; warning: string | null }>('/api/profile', { method: 'PUT', json: { profile: body } });
       // Show exactly what was stored.
       setP(out.profile);
       setSkillsText(out.profile.skills.join(', '));
       setCitiesText(out.profile.onsiteCities.join(', '));
+      setLangsText(out.profile.languages.join(', '));
       setMsg(out.warning ? `Saved. ${out.warning}` : `Saved. ${out.grilled} jobs re-scored.`);
       router.refresh();
     } catch (e) {
@@ -89,9 +112,9 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
     <div className="flex flex-col gap-5">
       <section className="surface flex flex-col gap-3 p-4 md:p-5">
         <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary"><Upload className="h-5 w-5" /></span>
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-muted"><Upload className="h-5 w-5" /></span>
           <div>
-            <h2 className="font-bold">Import your resume</h2>
+            <h2 className="text-[15px] font-semibold">Import your resume</h2>
             <p className="text-sm leading-5 text-muted-foreground">PDF, DOCX or TXT. AI reads it into the fields below; nothing is saved until you press Save.</p>
           </div>
         </div>
@@ -101,8 +124,11 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
         </Button>
       </section>
 
-      <section className="surface grid grid-cols-1 gap-4 p-4 md:grid-cols-2 md:p-5">
-        <h2 className="section-title md:col-span-2">Basics</h2>
+      <nav aria-label="Profile sections" className="scroll-x sticky top-14 z-10 flex gap-1.5 bg-background/95 py-2 backdrop-blur lg:top-0">
+        {SECTIONS.map(([id, label]) => <a key={id} href={`#p-${id}`} className="chip shrink-0">{label}</a>)}
+      </nav>
+
+      <Card id="basics" title="Basics" desc="How you appear on resumes, emails and application forms." className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Field label="Name" id="name"><Input id="name" value={p.name} onChange={(e) => set('name', e.target.value)} /></Field>
         <Field label="Headline" id="headline"><Input id="headline" value={p.headline} onChange={(e) => set('headline', e.target.value)} placeholder="Senior Recruiter, Tech and GCC hiring" /></Field>
         <Field label="Email" id="email"><Input id="email" type="email" value={p.email} onChange={(e) => set('email', e.target.value)} /></Field>
@@ -113,10 +139,31 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
           <NumberInput id="years" value={p.yearsExperience} onValue={(n) => set('yearsExperience', n)} />
         </Field>
         <Field label="Portfolio" id="portfolio"><Input id="portfolio" value={p.portfolio} onChange={(e) => set('portfolio', e.target.value)} /></Field>
-      </section>
+        <Field label="Languages" id="langs" hint="Comma separated, e.g. English, Hindi, Kannada">
+          <Input id="langs" value={langsText} onChange={(e) => setLangsText(e.target.value)} />
+        </Field>
+      </Card>
 
-      <section className="surface grid grid-cols-1 gap-4 p-4 md:grid-cols-3 md:p-5">
-        <h2 className="section-title md:col-span-3">Pay and availability (Grill salary fit and Browser auto-fill)</h2>
+      <Card id="goals" title="What you want" desc="The full evaluation scores each job against these. Leave blank and it uses your headline.">
+        <Field label="Target roles (one per line)" id="targets" hint="e.g. Senior TA Partner, TA Lead, Talent Acquisition Manager">
+          <Textarea id="targets" rows={3} defaultValue={p.targetRoles.join('\n')} key={`t${rev}`} onBlur={(e) => set('targetRoles', lines(e.target.value))} />
+        </Field>
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-2 text-sm font-medium">Employers you prefer</legend>
+          {Object.entries(COMPANY_TYPES).map(([k, label]) => (
+            <label key={k} className="flex items-center gap-3 text-sm">
+              <input type="checkbox" className="h-5 w-5 accent-[hsl(var(--primary))]" checked={p.companyTypes.includes(k)}
+                onChange={(e) => set('companyTypes', e.target.checked ? [...p.companyTypes, k] : p.companyTypes.filter((x) => x !== k))} />
+              {label}
+            </label>
+          ))}
+        </fieldset>
+        <Field label="Dealbreakers (one per line)" id="deal" hint="Flagged as red flags in every evaluation, e.g. 5 days in office, bond or training repayment, night shifts">
+          <Textarea id="deal" rows={3} defaultValue={p.dealbreakers.join('\n')} key={`d${rev}`} onBlur={(e) => set('dealbreakers', lines(e.target.value))} />
+        </Field>
+      </Card>
+
+      <Card id="pay" title="Pay and notice" desc="Used for the Grill's pay fit, negotiation scripts and form auto-fill. Decimals like 22.5 work." className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Field label="Expected CTC (lakh per year)" id="expected">
           <NumberInput id="expected" value={p.expectedSalaryLpa} onValue={(n) => set('expectedSalaryLpa', n)} placeholder="24" />
         </Field>
@@ -126,27 +173,23 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
         <Field label="Notice period" id="notice">
           <Input id="notice" value={p.noticePeriod} onChange={(e) => set('noticePeriod', e.target.value)} placeholder="Immediate (0 days)" />
         </Field>
-      </section>
+      </Card>
 
-      <section className="surface flex flex-col gap-4 p-4 md:p-5">
-        <h2 className="section-title">Where you will work (the Grill&apos;s strict location check)</h2>
+      <Card id="where" title="Where you work" desc="The Grill drops jobs outside these rules to zero on location.">
         <label className="flex items-center gap-3 text-sm"><input type="checkbox" className="h-5 w-5 accent-[hsl(var(--primary))]" checked={p.acceptRemote} onChange={(e) => set('acceptRemote', e.target.checked)} /> Remote roles open to India</label>
         <label className="flex items-center gap-3 text-sm"><input type="checkbox" className="h-5 w-5 accent-[hsl(var(--primary))]" checked={p.acceptHybrid} onChange={(e) => set('acceptHybrid', e.target.checked)} /> Hybrid roles in my cities</label>
         <Field label="On-site cities (comma separated)" id="cities"><Input id="cities" value={citiesText} onChange={(e) => setCitiesText(e.target.value)} /></Field>
-      </section>
+      </Card>
 
-      <section className="surface flex flex-col gap-4 p-4 md:p-5">
-        <Field label="Skills (comma separated; the Grill's 40%)" id="skills">
+      <Card id="skills" title="Skills and summary" desc="Skills are 40% of the Grill score: list the words job posts use.">
+        <Field label="Skills (comma separated)" id="skills">
           <Textarea id="skills" rows={3} value={skillsText} onChange={(e) => setSkillsText(e.target.value)} placeholder="talent acquisition, tech hiring, boolean search, stakeholder management" />
         </Field>
         <Field label="Summary" id="summary"><Textarea id="summary" rows={4} value={p.summary} onChange={(e) => set('summary', e.target.value)} /></Field>
-      </section>
+      </Card>
 
-      <section className="surface flex flex-col gap-4 p-4 md:p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="section-title">Experience</h2>
-          <Button size="sm" variant="outline" onClick={() => { set('experience', [{ company: '', title: '', location: '', start: '', end: '', bullets: [] }, ...exp]); setRev((r) => r + 1); }}><Plus /> Role</Button>
-        </div>
+      <Card id="experience" title="Experience" desc="Newest first. One bullet per line; numbers you can defend in an interview."
+        action={<Button size="sm" variant="outline" onClick={() => { set('experience', [{ company: '', title: '', location: '', start: '', end: '', bullets: [] }, ...exp]); setRev((r) => r + 1); }}><Plus /> Role</Button>}>
         {exp.map((e, i) => (
           <div key={`${rev}-${i}`} className="grid grid-cols-2 gap-3 rounded-xl border bg-muted/40 p-3">
             <Input className="col-span-2" aria-label="Title" placeholder="Title" value={e.title} onChange={(ev) => setExp(i, { title: ev.target.value })} />
@@ -158,10 +201,9 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
             <Button size="sm" variant="ghost" className="col-span-2 justify-self-start" onClick={() => { set('experience', exp.filter((_, n) => n !== i)); setRev((r) => r + 1); }}><Trash2 /> Remove role</Button>
           </div>
         ))}
-      </section>
+      </Card>
 
-      <section className="surface flex flex-col gap-4 p-4 md:p-5">
-        <h2 className="section-title">Education</h2>
+      <Card id="education" title="Education and certifications">
         {p.education.map((e, i) => (
           <div key={i} className="grid grid-cols-2 gap-3">
             <Input className="col-span-2" aria-label="Degree" placeholder="Degree" value={e.degree} onChange={(ev) => set('education', p.education.map((x, n) => (n === i ? { ...x, degree: ev.target.value } : x)))} />
@@ -177,7 +219,7 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
         <Field label="Achievements (one per line)" id="ach">
           <Textarea id="ach" rows={3} defaultValue={p.achievements.join('\n')} key={`a${rev}`} onBlur={(e) => set('achievements', lines(e.target.value))} />
         </Field>
-      </section>
+      </Card>
 
       <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 -mx-4 flex flex-col gap-2 border-t bg-background/90 px-4 py-3 backdrop-blur-xl md:bottom-0 md:mx-0 md:px-0">
         <Button onClick={save} disabled={!!busy} size="lg">{busy === 'save' ? 'Saving…' : 'Save profile'}</Button>

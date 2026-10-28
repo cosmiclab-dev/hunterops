@@ -20,12 +20,36 @@ const LOCATION_OPTIONS = {
   remote_other: 'Remote (other regions)',
 };
 
-function Section({ title, children, id }: { title: string; children: React.ReactNode; id?: string }) {
+function Section({ title, desc, children, id }: { title: string; desc?: React.ReactNode; children: React.ReactNode; id?: string }) {
   return (
-    <section id={id} className="surface flex scroll-mt-8 flex-col gap-4 p-4 md:p-5">
-      <h2 className="text-base font-semibold">{title}</h2>
+    <section id={id} className="surface flex scroll-mt-24 flex-col gap-4 p-4 md:p-5">
+      <div>
+        <h3 className="text-[15px] font-semibold">{title}</h3>
+        {desc && <p className="mt-1 text-sm leading-6 text-muted-foreground">{desc}</p>}
+      </div>
       {children}
     </section>
+  );
+}
+
+// Settings are grouped the way people think about them; each group is a
+// heading the index jumps to.
+export const SETTINGS_GROUPS = [
+  { id: 'selftest', label: 'Check' },
+  { id: 'ai', label: 'AI' },
+  { id: 'email', label: 'Email' },
+  { id: 'search', label: 'Job search' },
+  { id: 'writing', label: 'Writing' },
+  { id: 'boards', label: 'Company boards' },
+  { id: 'appearance', label: 'Appearance' },
+] as const;
+
+function Group({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  return (
+    <div id={`g-${id}`} className="flex scroll-mt-24 flex-col gap-3">
+      <h2 className="px-1 text-xs font-medium text-muted-foreground">{title}</h2>
+      {children}
+    </div>
   );
 }
 
@@ -33,8 +57,8 @@ function Status({ msg, err }: { msg: string; err: string }) {
   return <>{msg && <p className="meta" role="status">{msg}</p>}{err && <p className="text-sm text-destructive" role="alert">{err}</p>}</>;
 }
 
-export function SettingsForm({ initial, providers, companies: initialCompanies, appSecret }: {
-  initial: Pub; providers: Record<string, ProviderDef>; companies: Company[]; appSecret: boolean;
+export function SettingsForm({ initial, providers, companies: initialCompanies, appSecret, selfTest }: {
+  initial: Pub; providers: Record<string, ProviderDef>; companies: Company[]; appSecret: boolean; selfTest?: React.ReactNode;
 }) {
   const [s, setS] = useState(initial);
   const [provider, setProvider] = useState(initial.llm_provider.value || 'opencode');
@@ -58,6 +82,10 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
   const [search, setSearch] = useState({ provider: initial.search_provider.value && initial.search_provider.value !== 'none' ? initial.search_provider.value : 'free', key: '' });
   const [searchMsg, setSearchMsg] = useState({ msg: '', err: '' });
   const [banned, setBanned] = useState(initial.banned_words_extra.value || '');
+  const [writing, setWriting] = useState({ tone: initial.writing_tone?.value || 'warm', length: initial.email_length?.value || 'standard', signature: initial.email_signature?.value || '' });
+  const [writingMsg, setWritingMsg] = useState({ msg: '', err: '' });
+  const [boardFilter, setBoardFilter] = useState<'all' | 'error' | 'paused'>('all');
+  const boardMatch = (c: Company, f: 'all' | 'error' | 'paused') => (f === 'all' ? true : f === 'paused' ? !c.active : c.active && c.lastStatus === 'error');
   const [bannedMsg, setBannedMsg] = useState({ msg: '', err: '' });
 
   const [companies, setCompanies] = useState(initialCompanies);
@@ -145,6 +173,16 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
     }
   }
 
+  async function saveWriting() {
+    setWritingMsg({ msg: '', err: '' });
+    try {
+      await save({ writing_tone: writing.tone, email_length: writing.length, email_signature: writing.signature.trim() || null });
+      setWritingMsg({ msg: 'Saved. New drafts use this style.', err: '' });
+    } catch (e) {
+      setWritingMsg({ msg: '', err: (e as Error).message });
+    }
+  }
+
   async function saveFeed() {
     setFeedMsg({ msg: '', err: '' });
     try {
@@ -185,20 +223,21 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)]">
+      <nav aria-label="Settings sections" className="scroll-x sticky top-14 z-10 -mt-2 flex gap-1.5 bg-background/95 py-2 backdrop-blur lg:top-6 lg:mx-0 lg:flex-col lg:self-start lg:px-0 lg:py-0">
+        {SETTINGS_GROUPS.map((g) => (
+          <a key={g.id} href={`#g-${g.id}`} className="chip shrink-0 lg:h-9 lg:justify-start lg:rounded-md lg:border-0 lg:bg-transparent lg:px-3 lg:text-sm lg:hover:bg-accent">{g.label}</a>
+        ))}
+      </nav>
+      <div className="flex min-w-0 flex-col gap-8">
       {!appSecret && (
         <p className="rounded-xl border border-destructive bg-destructive/5 p-4 text-sm leading-5">
           APP_SECRET is not set (or shorter than 32 characters), so API keys cannot be saved here. Add it in Vercel environment variables, or set the provider key as an environment variable instead.
         </p>
       )}
-
-      <Section title="Appearance">
-        <p className="text-sm leading-5 text-muted-foreground">Auto follows your iPhone&apos;s light or dark mode.</p>
-        <ThemeSwitch />
-      </Section>
-
-      <Section title="AI model">
-        <p className="text-sm leading-5">Default: OpenCode Go with DeepSeek. Any provider below works the same way: pick it, paste a key, pick a model. The custom option takes any OpenAI-compatible API.</p>
+        <Group id="selftest" title="Check">{selfTest}</Group>
+        <Group id="ai" title="AI">
+      <Section title="AI model" desc="Writes your emails, evaluations and prep. Default: OpenCode Go with DeepSeek. Any provider works the same way: pick it, paste a key, pick a model.">
         <div className="flex flex-col gap-1">
           <Label htmlFor="provider">Provider</Label>
           <select id="provider" value={provider} onChange={(e) => { setProvider(e.target.value); setModel(''); setKey(''); }} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
@@ -236,9 +275,9 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         </div>
         <Status msg={ai.msg} err={ai.err} />
       </Section>
-
-      <Section title="Gmail (recruiter emails)">
-        <p className="text-sm leading-5">Use a Google app password (Google Account → Security → App passwords). Emails only go out when you press Approve and send on a draft.</p>
+        </Group>
+        <Group id="email" title="Email">
+      <Section title="Gmail" desc="Use a Google app password (Google Account → Security → App passwords). An email only goes out when you press Approve and send on that draft.">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1"><Label htmlFor="guser">Gmail address</Label><Input id="guser" type="email" value={gmail.user} onChange={(e) => setGmail({ ...gmail, user: e.target.value })} /></div>
           <div className="flex flex-col gap-1"><Label htmlFor="gpass">App password</Label><Input id="gpass" type="password" autoComplete="off" value={gmail.pass} onChange={(e) => setGmail({ ...gmail, pass: e.target.value })} placeholder={s.smtp_app_password.hint ? `Saved: ${s.smtp_app_password.hint}` : '16 characters'} /></div>
@@ -248,8 +287,9 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         <Button className="self-start" onClick={saveMail}>Save</Button>
         <Status {...mail} />
       </Section>
-
-      <Section title="Job feed">
+        </Group>
+        <Group id="search" title="Job search">
+      <Section title="Job feed" desc="What the scan looks for. Changes apply from the next scan.">
         <div className="flex flex-col gap-1"><Label htmlFor="kw">Role keywords (comma separated)</Label><Textarea id="kw" rows={3} value={feed.keywords} onChange={(e) => setFeed({ ...feed, keywords: e.target.value })} /></div>
         <div className="flex flex-col gap-1"><Label htmlFor="ex">Exclude titles with</Label><Input id="ex" value={feed.exclude} onChange={(e) => setFeed({ ...feed, exclude: e.target.value })} /></div>
         <fieldset className="flex flex-col gap-2">
@@ -269,12 +309,7 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         <Button className="self-start" onClick={saveFeed}>Save</Button>
         <Status {...feedMsg} />
       </Section>
-
-      <Section title="Web search (Discover)" id="search">
-        <p className="text-sm leading-6 text-muted-foreground">
-          Discover searches Greenhouse, Lever, Ashby, SmartRecruiters and Workday for fresh postings and shows them inside HunterOps.
-          The free option needs no key: it reads Bing&apos;s public results, then DuckDuckGo. A key is optional and only gives steadier results.
-        </p>
+      <Section title="Web search" id="search" desc="Used by Discover, company research and contact finding. The free option needs no key: Bing’s public results, then DuckDuckGo. A key only gives steadier results.">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1">
             <Label htmlFor="sprov">Search source</Label>
@@ -294,22 +329,55 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         <Button className="self-start" onClick={saveSearch}>Save</Button>
         <Status {...searchMsg} />
       </Section>
-
-      <Section title="Anti-Slop: extra banned words">
-        <p className="text-sm leading-6 text-muted-foreground">On top of the 16 built-in phrases (delve, testament to, landscape, tapestry…). Comma or one per line. Any AI draft that still uses them after one rewrite is rejected.</p>
+        </Group>
+        <Group id="writing" title="Writing">
+      <Section title="Email style" desc="Applies to every new email and cover letter draft.">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="tone">Tone</Label>
+            <select id="tone" value={writing.tone} onChange={(e) => setWriting({ ...writing, tone: e.target.value })} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+              <option value="warm">Warm: like a colleague</option>
+              <option value="formal">Formal: large companies, senior leaders</option>
+              <option value="direct">Direct: the point first, no pleasantries</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="elen">Length</Label>
+            <select id="elen" value={writing.length} onChange={(e) => setWriting({ ...writing, length: e.target.value })} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+              <option value="standard">Standard (up to 120 words)</option>
+              <option value="short">Short (up to 80 words)</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="sig">Signature</Label>
+          <Textarea id="sig" rows={3} value={writing.signature} onChange={(e) => setWriting({ ...writing, signature: e.target.value })} placeholder={'Divya Sharma\nSenior Recruiter · +91 98xxxxxxx · linkedin.com/in/…'} />
+        </div>
+        <Button className="self-start" onClick={saveWriting}>Save</Button>
+        <Status {...writingMsg} />
+      </Section>
+      <Section title="Banned words" desc="On top of the built-in list (delve, testament to, landscape, tapestry…). Comma or one per line. A draft that still uses them after one rewrite is rejected.">
         <Textarea id="banned" rows={3} value={banned} onChange={(e) => setBanned(e.target.value)} placeholder="synergy, leverage, passionate" aria-label="Extra banned words" />
         <Button className="self-start" onClick={saveBanned}>Save</Button>
         <Status {...bannedMsg} />
       </Section>
-
-      <Section title={`Company boards (${companies.filter((c) => c.active).length} active)`}>
+        </Group>
+        <Group id="boards" title="Company boards">
+      <Section title={`Company boards (${companies.filter((c) => c.active).length} active)`} desc="Career sites the scan reads directly. Paste any Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Recruitee or Workable link to add one. Boards that no longer exist pause themselves.">
         <form onSubmit={addCompany} className="flex gap-2">
           <Input value={careersUrl} onChange={(e) => setCareersUrl(e.target.value)} placeholder="Careers URL: boards.greenhouse.io/acme, jobs.lever.co/acme…" aria-label="Careers URL" required />
           <Button type="submit">Add</Button>
         </form>
         <Status {...srcMsg} />
-        <ul className="flex flex-col">
-          {companies.map((c) => (
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter boards">
+          {(['all', 'error', 'paused'] as const).map((f) => (
+            <button key={f} type="button" className="chip" data-on={boardFilter === f} onClick={() => setBoardFilter(f)}>
+              {f === 'all' ? 'All' : f === 'error' ? 'Errors' : 'Paused'} <span className="opacity-70">{companies.filter((c) => boardMatch(c, f)).length}</span>
+            </button>
+          ))}
+        </div>
+        <ul className="flex max-h-[28rem] flex-col overflow-y-auto">
+          {companies.filter((c) => boardMatch(c, boardFilter)).map((c) => (
             <li key={c.id} className="flex items-center justify-between gap-2 border-t py-2">
               <div className="min-w-0">
                 <p className={`truncate text-sm ${c.active ? '' : 'line-through opacity-50'}`}>{c.name}</p>
@@ -320,6 +388,13 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
           ))}
         </ul>
       </Section>
+        </Group>
+        <Group id="appearance" title="Appearance">
+      <Section title="Theme" desc="Auto follows your iPhone’s light or dark mode.">
+        <ThemeSwitch />
+      </Section>
+        </Group>
+      </div>
     </div>
   );
 }

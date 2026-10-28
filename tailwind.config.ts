@@ -11,7 +11,8 @@ const config: Config = {
     container: { center: true, padding: '1rem', screens: { md: '768px' } },
     extend: {
       fontFamily: {
-        sans: [DESIGN.fonts.body, 'system-ui', '-apple-system', 'sans-serif'],
+        // The iPhone's own SF Pro first; Inter where it is not available.
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', DESIGN.fonts.body, 'system-ui', 'sans-serif'],
         mono: [DESIGN.fonts.meta, 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       colors: {
@@ -35,7 +36,7 @@ const config: Config = {
         info: 'hsl(var(--info))',
         sidebar: 'hsl(var(--sidebar))',
         // Grill Score bands.
-        grill: { red: '#DC2626', yellow: '#CA8A04', green: '#16A34A' },
+        grill: { red: '#C9343E', yellow: '#B7791F', green: '#2F8A4C' },
       },
       borderRadius: { xl: 'calc(var(--radius) + 4px)', lg: 'var(--radius)', md: 'calc(var(--radius) - 4px)', sm: 'calc(var(--radius) - 6px)' },
     },

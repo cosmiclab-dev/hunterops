@@ -77,7 +77,7 @@ export function Writer({ job, onLogged }: { job: { id: string; title: string; co
           <Label htmlFor="o-req">Req details or link</Label>
           <Textarea id="o-req" rows={3} value={f.req} onChange={set('req')} placeholder="Paste the posting link or a line about the opening" />
         </div>
-        {job && <p className="text-xs text-muted-foreground">Linked to <Link href={`/jobs/${job.id}`} className="font-semibold text-primary">{job.title}</Link>; the JD is used automatically.</p>}
+        {job && <p className="text-xs text-muted-foreground">Linked to <Link href={`/jobs/${job.id}`} className="font-semibold text-info">{job.title}</Link>; the JD is used automatically.</p>}
         <Button type="submit" disabled={busy}>{busy ? <Loader2 className="animate-spin" /> : <Sparkles />} {busy ? 'Writing…' : scripts.length ? 'Write again' : 'Write messages'}</Button>
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       </form>
@@ -248,7 +248,7 @@ export function Log({ items }: { items: LogItem[] }) {
               <IconChip icon={l.status === 'replied' ? MessageCircleReply : l.status === 'sent' ? Send : PenLine} tone={l.status === 'replied' ? 'success' : l.status === 'sent' ? 'primary' : 'muted'} />
               <div className="min-w-0 flex-1">
                 <p className="font-semibold leading-5">{l.recipientName ? `${l.recipientName} · ` : ''}{l.recipientRole}</p>
-                <p className="text-sm text-muted-foreground">{l.company} · {CHANNELS[l.channel as keyof typeof CHANNELS] || l.channel}{l.job ? <> · <Link href={`/jobs/${l.job.id}`} className="text-primary">{l.job.title}</Link></> : null}</p>
+                <p className="text-sm text-muted-foreground">{l.company} · {CHANNELS[l.channel as keyof typeof CHANNELS] || l.channel}{l.job ? <> · <Link href={`/jobs/${l.job.id}`} className="text-info">{l.job.title}</Link></> : null}</p>
               </div>
               <Pill tone={l.status === 'replied' ? 'success' : l.status === 'sent' ? 'primary' : 'muted'} className="capitalize">{l.status}</Pill>
             </div>

@@ -18,7 +18,7 @@ export default async function InsightsPage({ searchParams }: { searchParams: { t
   ]);
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader eyebrow="Career-Ops" title="Insights" sub="What is working, skill gaps, wider job titles, recruiter replies and your interview story bank." />
+      <PageHeader title="Insights" sub="What is working, skill gaps, wider job titles, recruiter replies and your interview story bank." />
       <Tabs defaultValue={searchParams.tab === 'stories' ? 'stories' : 'tools'}>
         <TabsList>
           <TabsTrigger value="tools">Tools</TabsTrigger>
