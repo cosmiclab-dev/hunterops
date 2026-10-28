@@ -54,27 +54,19 @@ export const SEED_COMPANIES: [name: string, atsType: string, atsSlug: string][] 
   ['JLL', 'workday', 'jll.wd1.myworkdayjobs.com|jllcareers'],
   ['Autodesk', 'workday', 'autodesk.wd1.myworkdayjobs.com|Ext'],
   // Added 2026-10: India product companies, GCCs and remote-first employers that
-  // hire recruiters. Not every slug could be checked before shipping: a board
-  // that answers 404 on its first scan is paused automatically.
-  ['PhonePe', 'greenhouse', 'phonepe'],
+  // hire recruiters. Every slug was checked against the live boards on 2026-10-28
+  // (the daily live check in .github/workflows/checks.yml keeps watching them).
   ['Groww', 'greenhouse', 'groww'],
-  ['Postman', 'greenhouse', 'postman'],
-  ['BrowserStack', 'greenhouse', 'browserstack'],
-  ['Chargebee', 'greenhouse', 'chargebee'],
-  ['Innovaccer', 'greenhouse', 'innovaccer'],
-  ['Rippling', 'greenhouse', 'rippling'],
-  ['Remote', 'greenhouse', 'remotecom'],
-  ['Confluent', 'greenhouse', 'confluent'],
+  ['Remote', 'greenhouse', 'remote'],
   ['Coinbase', 'greenhouse', 'coinbase'],
   ['Airbnb', 'greenhouse', 'airbnb'],
   ['Dropbox', 'greenhouse', 'dropbox'],
   ['Pinterest', 'greenhouse', 'pinterest'],
-  ['Nutanix', 'greenhouse', 'nutanix'],
   ['Zscaler', 'greenhouse', 'zscaler'],
   ['Glean', 'greenhouse', 'gleanwork'],
   ['Intercom', 'greenhouse', 'intercom'],
   ['Celonis', 'greenhouse', 'celonis'],
-  ['Toptal', 'greenhouse', 'toptal'],
+  ['Toptal', 'lever', 'toptal'],
   ['Turing', 'greenhouse', 'turing'],
   ['Freshworks', 'smartrecruiters', 'Freshworks'],
   ['Visa', 'smartrecruiters', 'Visa'],
@@ -82,16 +74,14 @@ export const SEED_COMPANIES: [name: string, atsType: string, atsSlug: string][] 
   ['Canva', 'smartrecruiters', 'Canva'],
   ['ServiceNow', 'smartrecruiters', 'ServiceNow'],
   ['Equinix', 'smartrecruiters', 'Equinix'],
-  ['Swiggy', 'lever', 'swiggy'],
-  ['ShareChat', 'lever', 'sharechat'],
-  ['InMobi', 'lever', 'inmobi'],
+  ['Swiggy', 'smartrecruiters', 'Swiggy'],
+  ['InMobi', 'greenhouse', 'inmobi'],
+  ['Glance', 'greenhouse', 'glance'],
   ['Mindtickle', 'lever', 'mindtickle'],
-  ['Whatfix', 'lever', 'whatfix'],
+  ['Whatfix', 'smartrecruiters', 'Whatfix'],
   ['Highspot', 'lever', 'highspot'],
-  ['Zepto', 'lever', 'zeptonow'],
-  ['Dream Sports', 'lever', 'dreamsports'],
-  ['Upstox', 'lever', 'upstox'],
-  ['Cars24', 'lever', 'cars24'],
+  ['Upstox', 'smartrecruiters', 'Upstox'],
+  ['Cars24', 'smartrecruiters', 'Cars24'],
   ['Palantir', 'lever', 'palantir'],
   ['Deel', 'ashby', 'deel'],
   ['Zapier', 'ashby', 'zapier'],
@@ -100,11 +90,9 @@ export const SEED_COMPANIES: [name: string, atsType: string, atsSlug: string][] 
   ['Ramp', 'ashby', 'ramp'],
   ['Salesforce', 'workday', 'salesforce.wd12.myworkdayjobs.com|External_Career_Site'],
   ['NVIDIA', 'workday', 'nvidia.wd5.myworkdayjobs.com|NVIDIAExternalCareerSite'],
-  ['Walmart Global Tech', 'workday', 'walmart.wd5.myworkdayjobs.com|WalmartExternal'],
   ['Target', 'workday', 'target.wd5.myworkdayjobs.com|targetcareers'],
   ['Mastercard', 'workday', 'mastercard.wd1.myworkdayjobs.com|CorporateCareers'],
   ['Intel', 'workday', 'intel.wd1.myworkdayjobs.com|External'],
-  ['Dell', 'workday', 'dell.wd1.myworkdayjobs.com|External'],
   ['Cisco', 'workday', 'cisco.wd5.myworkdayjobs.com|Cisco_Careers'],
   ['Wells Fargo', 'workday', 'wf.wd1.myworkdayjobs.com|WellsFargoJobs'],
   ['Morgan Stanley', 'workday', 'ms.wd5.myworkdayjobs.com|External'],
@@ -116,15 +104,25 @@ export const SEED_COMPANIES: [name: string, atsType: string, atsSlug: string][] 
   ['Workday', 'workday', 'workday.wd5.myworkdayjobs.com|Workday'],
   ['Adobe', 'workday', 'adobe.wd5.myworkdayjobs.com|external_experienced'],
   ['PayPal', 'workday', 'paypal.wd1.myworkdayjobs.com|jobs'],
-  ['Synopsys', 'workday', 'synopsys.wd1.myworkdayjobs.com|careers'],
   ['Analog Devices', 'workday', 'analogdevices.wd1.myworkdayjobs.com|External'],
 ];
 
 // Bumped whenever SEED_COMPANIES grows, so existing databases pick up new boards.
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 
 // Boards that stopped answering; paused on existing databases.
 export const RETIRED_COMPANIES: [atsType: string, atsSlug: string][] = [
   ['lever', 'sprinto'],
   ['workday', 'takeda.wd3.myworkdayjobs.com|External'],
+  // Wrong slugs in the 2026-10 starter list (no board answered under any name tried).
+  ['greenhouse', 'phonepe'], ['greenhouse', 'postman'], ['greenhouse', 'browserstack'],
+  ['greenhouse', 'chargebee'], ['greenhouse', 'innovaccer'], ['greenhouse', 'rippling'],
+  ['greenhouse', 'confluent'], ['greenhouse', 'nutanix'], ['lever', 'sharechat'],
+  ['lever', 'zeptonow'], ['lever', 'dreamsports'],
+  ['workday', 'walmart.wd5.myworkdayjobs.com|WalmartExternal'],
+  ['workday', 'dell.wd1.myworkdayjobs.com|External'],
+  ['workday', 'synopsys.wd1.myworkdayjobs.com|careers'],
+  // Moved to the board they really use.
+  ['greenhouse', 'remotecom'], ['greenhouse', 'toptal'], ['lever', 'swiggy'], ['lever', 'inmobi'],
+  ['lever', 'whatfix'], ['lever', 'upstox'], ['lever', 'cars24'],
 ];
