@@ -3,7 +3,7 @@ import {
   ArrowRight, BellRing, ShieldCheck, CalendarClock, Flame, Handshake, Lightbulb, MessageSquareText, Radar, Send, Sparkles, Target, Trophy,
 } from 'lucide-react';
 import { prisma } from '@/lib/db';
-import { EmptyState, IconChip, PageHeader, Pill, Section, StatTile } from '@/components/kit';
+import { EmptyState, IconChip, Pill, Section, StatTile } from '@/components/kit';
 import { GrillScoreBadge } from '@/components/grill-score-badge';
 import { ScanButton } from '@/components/scan-button';
 import { SetupCard } from '@/components/setup-card';
@@ -95,28 +95,36 @@ export default async function Dashboard() {
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader
-        eyebrow={now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
-        title={`${greet}${firstName ? `, ${firstName}` : ''}`}
-        sub={lastRun ? <>Last scan {timeAgo(lastRun.startedAt)} · {lastRun.inserted ?? 0} new jobs</> : 'No scans yet.'}
-        action={<ScanButton />}
-      />
-
-      {!setupDone && <SetupCard steps={steps} />}
-
-      <div className="surface flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:gap-6">
-        <div className="flex items-baseline gap-2">
-          <span className="text-4xl font-semibold tabular-nums tracking-tight">{daysLeft}</span>
-          <span className="text-sm text-muted-foreground">days</span>
+      {/* Dark product tile: the day's headline, the goal and the main action. */}
+      <section className="tile-dark flex flex-col gap-6 px-5 py-7 sm:px-10 sm:py-12">
+        <div className="flex flex-col gap-2">
+          <p className="text-[14px] font-semibold tracking-[-0.016em] text-white/60">
+            {now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })}
+          </p>
+          <h1 className="text-[32px] font-semibold leading-[1.07] tracking-[-0.01em] sm:text-[56px]">{greet}{firstName ? `, ${firstName}` : ''}.</h1>
+          <p className="text-[17px] leading-[1.47] text-white/70 sm:text-[21px]">
+            {lastRun ? <>Last scan {timeAgo(lastRun.startedAt)}, {lastRun.inserted ?? 0} new jobs.</> : 'No scans yet.'}
+          </p>
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">to your 31 December offer goal</p>
-          <p className="text-sm text-muted-foreground">{weekTotal} applications and messages in the last 7 days. Aim for 15 or more a week.</p>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, Math.round((weekTotal / 15) * 100))}%` }} />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 flex-1 sm:max-w-md">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[48px] font-semibold leading-none tracking-[-0.02em] tabular-nums sm:text-[64px]">{daysLeft}</span>
+              <span className="text-[17px] text-white/70">days to your 31 December offer</span>
+            </div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/15">
+              <div className="h-full rounded-full bg-[#2997ff]" style={{ width: `${Math.min(100, Math.round((weekTotal / 15) * 100))}%` }} />
+            </div>
+            <p className="mt-2 text-[14px] text-white/60">{weekTotal} of 15 applications and messages this week</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <ScanButton />
+            <Link href="/pipeline" className="inline-flex h-9 items-center self-start rounded-full border border-[#2997ff] px-4 text-[14px] tracking-[-0.016em] text-[#2997ff] transition-transform active:scale-95">Open pipeline</Link>
           </div>
         </div>
-      </div>
+      </section>
+
+      {!setupDone && <SetupCard steps={steps} />}
 
       <Section title="Do today">
         {nudges ? (
@@ -125,10 +133,10 @@ export default async function Dashboard() {
               <Link key={a.jobId} href={`/apply/${a.jobId}`} className="flex items-center gap-3 p-3 hover:bg-accent/60" data-testid="home-approval">
                 <IconChip icon={ShieldCheck} tone={a.status === 'PENDING' ? 'warning' : 'primary'} />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold leading-5">{a.status === 'PENDING' ? 'Approve' : 'Submit'} your application to {a.job.company}</p>
+                  <p className="truncate font-semibold leading-5">{a.job.company}</p>
                   <p className="truncate text-sm text-muted-foreground">{a.job.title}</p>
                 </div>
-                <Pill tone={a.status === 'PENDING' ? 'warning' : 'primary'}>{a.status === 'PENDING' ? 'approval pending' : 'ready'}</Pill>
+                <Pill tone={a.status === 'PENDING' ? 'warning' : 'primary'} className="shrink-0">{a.status === 'PENDING' ? 'Approval pending' : 'Ready to submit'}</Pill>
               </Link>
             ))}
             {followUps.map((f) => (

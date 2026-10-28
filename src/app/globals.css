@@ -9,68 +9,72 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Apple Liquid Glass (iOS): system grouped background, white glass cards
-   with a hairline and a soft ambient shadow, one system blue for actions,
-   rounded colourful icons. Dark mode uses iOS's black and elevated greys.
+/* Apple design system (the person's brief): parchment canvas, white cards on
+   a hairline with no shadow, near-black ink, ONE blue for every action, pill
+   buttons, tight 600-weight headlines, 17px body. Liquid Glass is the material
+   for anything that floats over content: bars, the tab bar, sticky actions.
+   Dark mode uses Apple's near-black tiles and the brighter on-dark blue.
    The <html> element gets .dark from the theme script in layout.tsx. */
 @layer base {
   :root {
-    --background: 240 24% 96%;         /* #F2F2F7 */
-    --foreground: 0 0% 0%;
+    --background: 240 11% 96%;         /* parchment #F5F5F7 */
+    --foreground: 240 3% 12%;          /* ink #1D1D1F */
     --card: 0 0% 100%;
-    --card-foreground: 240 6% 11%;     /* #1C1C1E */
+    --card-foreground: 240 3% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 6% 11%;
-    --primary: 211 100% 50%;           /* system blue #007AFF */
+    --popover-foreground: 240 3% 12%;
+    --primary: 210 100% 40%;           /* Action Blue #0066CC */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 6% 94%;
-    --secondary-foreground: 240 6% 11%;
-    --muted: 240 6% 94%;
-    --muted-foreground: 240 2% 43%;    /* #6C6C70 */
+    --secondary: 240 20% 98%;          /* pearl #FAFAFC */
+    --secondary-foreground: 0 0% 20%;
+    --muted: 240 6% 93%;
+    --muted-foreground: 240 2% 44%;    /* #6E6E73 */
     --accent: 240 6% 94%;
-    --accent-foreground: 240 6% 11%;
-    --destructive: 3 100% 59%;         /* #FF3B30 */
+    --accent-foreground: 240 3% 12%;
+    --destructive: 0 72% 46%;
     --destructive-foreground: 0 0% 100%;
-    --success: 135 59% 40%;            /* deeper #34C759 for text contrast */
-    --warning: 28 100% 42%;
-    --info: 199 85% 40%;
-    --border: 240 6% 88%;
-    --input: 240 6% 86%;
-    --ring: 211 100% 50%;
-    --radius: 12px;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.05);
-    --sidebar: 240 24% 96%;
-    --glow: 211 100% 50%;
-    --glass: 0 0% 100%;
+    --success: 137 64% 31%;
+    --warning: 30 100% 36%;
+    --info: 210 100% 40%;
+    --border: 0 0% 88%;                /* hairline #E0E0E0 */
+    --input: 0 0% 85%;
+    --ring: 211 100% 45%;              /* Focus Blue #0071E3 */
+    --radius: 18px;
+    --shadow: none;
+    --sidebar: 240 11% 96%;
+    --glow: 210 100% 40%;
+    --glass: 240 11% 98%;
+    --tile: 240 2% 16%;                /* dark product tile #272729 */
     color-scheme: light;
   }
   .dark {
     --background: 0 0% 0%;
-    --foreground: 0 0% 100%;
-    --card: 240 6% 11%;                /* #1C1C1E */
+    --foreground: 0 0% 96%;
+    --card: 240 3% 12%;                /* #1D1D1F */
     --card-foreground: 0 0% 96%;
-    --popover: 240 4% 17%;             /* #2C2C2E */
+    --popover: 240 2% 16%;
     --popover-foreground: 0 0% 96%;
-    --primary: 211 100% 52%;           /* #0A84FF */
+    --primary: 209 100% 58%;           /* Sky Link Blue #2997FF */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 17%;
-    --secondary-foreground: 0 0% 96%;
-    --muted: 240 4% 17%;
-    --muted-foreground: 240 3% 62%;
-    --accent: 240 4% 20%;
+    --secondary: 240 2% 16%;
+    --secondary-foreground: 0 0% 90%;
+    --muted: 240 2% 17%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 240 2% 19%;
     --accent-foreground: 0 0% 96%;
-    --destructive: 3 100% 61%;
+    --destructive: 3 100% 64%;
     --destructive-foreground: 0 0% 100%;
-    --success: 135 59% 52%;
-    --warning: 33 100% 55%;
-    --info: 199 90% 60%;
-    --border: 240 4% 22%;
-    --input: 240 4% 26%;
-    --ring: 211 100% 52%;
-    --shadow: 0 0 0 1px rgb(255 255 255 / 0.04);
+    --success: 135 55% 55%;
+    --warning: 35 100% 58%;
+    --info: 209 100% 58%;
+    --border: 240 2% 22%;
+    --input: 240 2% 26%;
+    --ring: 209 100% 58%;
+    --shadow: none;
     --sidebar: 0 0% 0%;
-    --glow: 211 100% 52%;
-    --glass: 240 6% 11%;
+    --glow: 209 100% 58%;
+    --glass: 240 3% 12%;
+    --tile: 240 2% 16%;
     color-scheme: dark;
   }
   * { @apply border-border; }
@@ -80,11 +84,15 @@
     font-size: 17px;
     line-height: 1.47;
     letter-spacing: -0.022em;
+    font-feature-settings: 'ss03';
     /* Nothing may widen the page past the screen: a wide child would stretch
        the phone's layout viewport and push the tab bar off screen. */
     overflow-x: clip;
   }
-  h1, h2, h3 { letter-spacing: -0.015em; }
+  h1, h2, h3 { font-weight: 600; letter-spacing: -0.02em; }
+  /* A grid item may not grow past its track: a long job title would otherwise
+     widen the whole page on a phone and cut the screen off at the left. */
+  .grid > * { min-width: 0; }
   /* iOS zooms into inputs under 16px; keep form text at 17px on phones. */
   input, textarea, select { font-size: 17px; }
   @media (min-width: 768px) { input, textarea, select { font-size: 15px; } }
@@ -107,37 +115,49 @@
 }
 
 @layer components {
-  .meta { @apply text-xs leading-4 text-muted-foreground; letter-spacing: 0; }
-  .label-caps { @apply text-xs font-medium leading-4; letter-spacing: 0; }
-  /* Glass slab: white card, hairline, soft ambient shadow. */
-  .surface { @apply rounded-[20px] border border-black/[0.06] bg-card text-card-foreground; box-shadow: var(--shadow); }
-  .dark .surface { @apply border-white/[0.06]; }
-  /* iOS large title. */
-  .page-title { @apply text-[30px] font-bold leading-[1.1] sm:text-[34px]; letter-spacing: -0.025em; }
-  .section-title { @apply label-caps text-muted-foreground; }
-  /* Option chips: white pill, blue ring when chosen (Apple's configurator). */
+  .meta { @apply text-xs leading-4 text-muted-foreground; letter-spacing: -0.01em; }
+  .label-caps { @apply text-[13px] font-semibold leading-4 text-muted-foreground; letter-spacing: -0.01em; }
+  /* Utility card: white on parchment, one hairline, 18px corners, no shadow. */
+  .surface { @apply rounded-[18px] border border-black/[0.08] bg-card text-card-foreground; }
+  .dark .surface { @apply border-white/[0.08]; }
+  /* Apple-tight headlines: 600 weight, negative tracking. */
+  .page-title { @apply text-[28px] font-semibold leading-[1.1] sm:text-[40px]; letter-spacing: -0.015em; }
+  .section-title { @apply label-caps; }
+  /* Configurator chips: pill, blue ring when chosen. */
   .chip {
-    @apply inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3.5 text-sm transition-[transform,colors] active:scale-95;
-    letter-spacing: -0.01em;
+    @apply inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border border-black/[0.08] bg-card px-4 text-[14px] transition-[transform,colors] active:scale-95;
+    letter-spacing: -0.016em;
   }
-  .chip[data-on='true'] { @apply border-primary bg-primary/10 font-medium text-primary; }
+  .dark .chip { @apply border-white/[0.1]; }
+  .chip[data-on='true'] { @apply border-2 border-primary bg-card px-[15px] font-semibold text-primary; }
+  /* Dark product tile: the Apple section break, used for page heroes. */
+  .tile-dark { @apply rounded-[18px] text-white; background: hsl(var(--tile)); }
+  .dark .tile-dark { background: hsl(240 3% 12%); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08); }
   .hero-glow { background: transparent; }
   .kbd { @apply rounded border bg-muted px-1.5 font-mono text-[11px] text-muted-foreground; }
   /* contain: paint keeps a wide scroller from stretching the phone's layout viewport. */
   .scroll-x { @apply -mx-4 overflow-x-auto px-4; scrollbar-width: none; contain: paint; }
   .scroll-x::-webkit-scrollbar { display: none; }
-  /* Liquid Glass: translucent material for bars that float over content. */
+  /* Liquid Glass: a translucent, light-bending material for controls that
+     float over content. Blur and saturation pull colour through; a bright
+     top edge and a faint rim give it the glass lip. */
   .glass {
     background: hsl(var(--glass) / 0.72);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
   }
   .glass-float {
-    @apply glass;
-    border: 1px solid hsl(0 0% 100% / 0.5);
-    box-shadow: 0 8px 32px rgb(0 0 0 / 0.12), inset 0 1px 0 hsl(0 0% 100% / 0.6);
+    background: linear-gradient(180deg, hsl(0 0% 100% / 0.78), hsl(0 0% 100% / 0.6));
+    -webkit-backdrop-filter: saturate(200%) blur(28px);
+    backdrop-filter: saturate(200%) blur(28px);
+    border: 1px solid hsl(0 0% 100% / 0.7);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.1), 0 1px 2px rgb(0 0 0 / 0.06), inset 0 1px 0 hsl(0 0% 100% / 0.9), inset 0 -1px 0 rgb(0 0 0 / 0.04);
   }
-  .dark .glass-float { border-color: hsl(0 0% 100% / 0.1); box-shadow: 0 8px 32px rgb(0 0 0 / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.08); }
+  .dark .glass-float {
+    background: linear-gradient(180deg, hsl(240 3% 22% / 0.72), hsl(240 3% 14% / 0.66));
+    border-color: hsl(0 0% 100% / 0.12);
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.14), inset 0 -1px 0 rgb(0 0 0 / 0.3);
+  }
 }
 
 /* Long links in pasted or generated text wrap instead of running off a phone screen. */

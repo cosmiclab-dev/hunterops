@@ -43,7 +43,7 @@ export function ScanButton({ label = 'Scan now' }: { label?: string }) {
       <Button size="sm" onClick={scan} disabled={busy} data-testid="scan">
         <RefreshCw className={busy ? 'animate-spin' : ''} /> {busy ? 'Scanning' : label}
       </Button>
-      {msg && <p className="max-w-72 text-right text-xs leading-5 text-muted-foreground" role="status">{msg}</p>}
+      {msg && <p className="max-w-72 text-right text-xs leading-5 opacity-70" role="status">{msg}</p>}
     </div>
   );
 }

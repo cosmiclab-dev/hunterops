@@ -51,11 +51,12 @@ const shot = (name) => page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage:
 await page.request.put(`${BASE}/api/settings`, { data: { values: { daily_email_cap: '20' } } });
 
 await page.goto(`${BASE}/`);
-await page.getByText('to your 31 December offer goal').waitFor();
+await page.getByText('days to your 31 December offer').waitFor();
 await page.getByText('Follow up with Practice Head').waitFor();
 const sidebar = page.getByRole('complementary', { name: 'Sidebar' });
 for (const label of ['Discover', 'Pipeline', 'Browser', 'Mailroom']) await sidebar.getByRole('link', { name: label }).waitFor();
-assert.ok((await sidebar.boundingBox()).x === 0, 'sidebar not fixed on the left');
+const box = await sidebar.boundingBox();
+assert.ok(box.x >= 0 && box.x <= 16, 'sidebar not fixed on the left');
 await noSideScroll(page, 'home');
 await shot('d00-home');
 ok('desktop home: fixed sidebar with Discover, Pipeline, Browser, Mailroom');

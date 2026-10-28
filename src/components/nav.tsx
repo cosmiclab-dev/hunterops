@@ -40,8 +40,8 @@ function SideLink({ item, pathname }: { item: Item; pathname: string }) {
       href={item.href}
       aria-current={on ? 'page' : undefined}
       className={cn(
-        'flex h-9 items-center gap-3 rounded-[10px] px-3 text-[15px] transition-colors',
-        on ? 'bg-card font-medium text-primary' : 'text-foreground/80 hover:bg-card/60 hover:text-foreground',
+        'flex h-10 items-center gap-3 rounded-full px-3.5 text-[15px] tracking-[-0.016em] transition-[transform,colors] active:scale-[0.97]',
+        on ? 'bg-primary/[0.1] font-semibold text-primary' : 'text-foreground/80 hover:bg-foreground/[0.05] hover:text-foreground',
       )}
     >
       <item.icon className="h-4 w-4" />
@@ -61,29 +61,29 @@ export function Nav() {
   if (pathname === '/login') return null;
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r bg-sidebar lg:flex" aria-label="Sidebar">
+      <aside className="glass-float fixed inset-y-3 left-3 z-40 hidden w-60 flex-col overflow-hidden rounded-[26px] lg:flex" aria-label="Sidebar">
         <div className="flex h-14 items-center px-4">
           <Link href="/" aria-label="HunterOps home"><Logo /></Link>
         </div>
         <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-2" aria-label="Main">
           <div className="flex flex-col gap-0.5">
-            <p className="px-3 pb-1 text-xs font-medium text-muted-foreground">Workspace</p>
+            <p className="label-caps px-3.5 pb-1.5">Workspace</p>
             {MAIN.map((i) => <SideLink key={i.href} item={i} pathname={pathname} />)}
           </div>
           <div className="flex flex-col gap-0.5">
-            <p className="px-3 pb-1 text-xs font-medium text-muted-foreground">Library</p>
+            <p className="label-caps px-3.5 pb-1.5">Library</p>
             {MORE.map((i) => <SideLink key={i.href} item={i} pathname={pathname} />)}
           </div>
         </nav>
-        <div className="flex items-center justify-between border-t px-3 py-3">
+        <div className="flex items-center justify-between border-t border-black/[0.06] px-3 py-3 dark:border-white/[0.08]">
           <ThemeButton />
-          <button type="button" onClick={signOut} className="inline-flex h-9 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">
+          <button type="button" onClick={signOut} className="inline-flex h-9 items-center gap-2 rounded-full px-3 text-sm text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground">
             <LogOut className="h-4 w-4" /> Sign out
           </button>
         </div>
       </aside>
 
-      <header className="glass sticky top-0 z-40 border-b border-border/60 pt-[env(safe-area-inset-top)] lg:hidden">
+      <header className="glass sticky top-0 z-40 border-b border-black/[0.06] pt-[env(safe-area-inset-top)] dark:border-white/[0.08] lg:hidden">
         <div className="flex h-12 items-center gap-2 px-4">
           <Link href="/" aria-label="HunterOps home"><Logo /></Link>
           <div className="ml-auto flex items-center">
@@ -102,13 +102,13 @@ export function Nav() {
       </header>
       {/* Liquid Glass tab bar: a floating capsule above the home indicator. */}
       <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),10px)] lg:hidden" aria-label="Tabs">
-        <div className="glass-float mx-auto grid max-w-md grid-cols-5 rounded-full p-1">
+        <div className="glass-float mx-auto grid max-w-md grid-cols-5 rounded-full p-1.5">
           {MAIN.map((i) => {
             const on = i.match(pathname);
             return (
-              <Link key={i.href} href={i.href} className={cn('flex h-[52px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-full transition-colors', on ? 'bg-foreground/[0.07] text-primary' : 'text-foreground/70')} aria-current={on ? 'page' : undefined}>
+              <Link key={i.href} href={i.href} className={cn('flex h-[54px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-full transition-[transform,colors] active:scale-95', on ? 'bg-white/70 text-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.9),0_1px_3px_rgb(0_0_0/0.08)] dark:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]' : 'text-foreground/75')} aria-current={on ? 'page' : undefined}>
                 <i.icon className="h-[21px] w-[21px]" strokeWidth={on ? 2.3 : 1.9} />
-                <span className="max-w-full truncate px-0.5 text-[10px] font-medium leading-3 tracking-normal">{i.label}</span>
+                <span className="max-w-full truncate px-0.5 text-[10px] font-semibold leading-3 tracking-normal">{i.label}</span>
               </Link>
             );
           })}
@@ -125,7 +125,7 @@ export function Frame({ children }: { children: React.ReactNode }) {
   if (pathname === '/login') return <main>{children}</main>;
   const wide = /^\/(browser|pipeline)/.test(pathname);
   return (
-    <div className="min-w-0 lg:pl-60">
+    <div className="min-w-0 lg:pl-[264px]">
       <main className={cn('mx-auto w-full min-w-0 px-4 pb-32 pt-6 md:px-6 lg:px-10 lg:pb-14 lg:pt-10', wide ? 'max-w-none' : 'max-w-6xl')}>{children}</main>
     </div>
   );
