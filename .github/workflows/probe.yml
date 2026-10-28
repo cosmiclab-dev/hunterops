@@ -1,0 +1,20 @@
+name: probe
+on: { push: { branches: ['claude/**'] } }
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Adzuna details and land pages
+        run: |
+          UA='Mozilla/5.0 (compatible; HunterOps/2.0; personal job search)'
+          for id in 5943994189 5942152785; do
+            echo "== details $id"; curl -s -A "$UA" -o d.html -w '%{http_code} %{url_effective}\n' -L "https://www.adzuna.in/details/$id"; wc -c d.html
+            grep -o 'href="[^"]*land/ad[^"]*"' d.html | head -3
+            grep -o '<title>[^<]*' d.html | head -1
+            grep -o 'adp-body[^>]*>' d.html | head -2
+            echo "== land $id"; curl -s -A "$UA" -o l.html -w '%{http_code} %{num_redirects} %{url_effective}\n' -L "https://www.adzuna.in/land/ad/$id?se=x&utm_medium=api&utm_source=e4e3c34f&v=1"; wc -c l.html; grep -o '<title>[^<]*' l.html | head -1
+            grep -io 'location.href[^;]*\|http-equiv="refresh"[^>]*' l.html | head -3
+          done
+      - name: Workday detail
+        run: |
+          curl -s 'https://paypal.wd1.myworkdayjobs.com/wday/cxs/paypal/jobs/job/Bangalore-Karnataka-India/Sr-Recruiter_R0138298' -H 'Accept: application/json' | head -c 600
