@@ -55,12 +55,25 @@ await step('sign in with the app password', async () => {
   await shot('home-first-run');
 });
 
-await step('the phone tabs are Home, Jobs, Apply, Pipeline and More', async () => {
-  for (const label of ['Home', 'Jobs', 'Apply', 'Pipeline', 'More']) await tab(label).waitFor();
-  await tab('More').click();
+await step('the phone tabs are Home, Jobs, Apply, Track and Me, and every page is in one of them', async () => {
+  for (const label of ['Home', 'Jobs', 'Apply', 'Track', 'Me']) await tab(label).waitFor();
+  await tab('Me').click();
+  await page.waitForURL(/\/profile$/);
+  const strip = page.getByTestId('section-tabs');
+  for (const label of ['Profile', 'Settings', 'Alerts', 'All pages']) await strip.getByRole('link', { name: label }).waitFor();
+  await strip.getByRole('link', { name: 'All pages' }).click();
   await page.waitForURL(/\/more$/);
-  for (const label of ['Discover', 'Mailroom', 'Browser', 'Insights', 'Profile', 'Settings']) await page.getByRole('link', { name: new RegExp(`^${label}`) }).first().waitFor();
+  for (const label of ['Jobs', 'Discover', 'Applications', 'Resume', 'Browser', 'Pipeline', 'Mailroom', 'Insights', 'Profile', 'Settings', 'Alerts']) await page.getByRole('link', { name: new RegExp(`^${label}`) }).first().waitFor();
+  await tab('Apply').click();
+  await page.waitForURL(/\/apply$/);
+  for (const label of ['Applications', 'Resume', 'Browser']) await strip.getByRole('link', { name: label }).waitFor();
+  await tab('Track').click();
+  await page.waitForURL(/\/pipeline$/);
+  for (const label of ['Pipeline', 'Mailroom', 'Insights']) await strip.getByRole('link', { name: label }).waitFor();
   await shot('more');
+  await tab('Me').click();
+  await strip.getByRole('link', { name: 'All pages' }).click();
+  await page.waitForURL(/\/more$/);
 });
 
 await step('connect the AI in Settings, and the Home step ticks', async () => {
@@ -73,7 +86,8 @@ await step('connect the AI in Settings, and the Home step ticks', async () => {
   const saved = answered('/api/settings');
   await page.locator('section', { has: page.locator('#provider') }).getByRole('button', { name: 'Save', exact: true }).click();
   assert.equal((await saved).status(), 200);
-  // Adzuna, so the scan also reads a job board listing.
+  // Adzuna, so the scan also reads a job board listing. Settings shows one group at a time.
+  await page.getByRole('navigation', { name: 'Settings sections' }).getByRole('button', { name: 'Job search' }).click();
   await page.fill('#az1', 'e2e-app');
   await page.fill('#az2', 'adzuna-e2e');
   const feed = answered('/api/settings');
@@ -180,7 +194,7 @@ await step('approve, open the company form, submit there, then mark it submitted
 });
 
 await step('the Pipeline shows it in Applied', async () => {
-  await tab('Pipeline').click();
+  await tab('Track').click();
   await page.waitForURL(/\/pipeline/);
   await page.locator('[data-column=applied]').getByText('Senior Technical Recruiter').first().waitFor();
   await shot('pipeline');
@@ -226,7 +240,7 @@ await step('start Apply, press back: the progress stays on every screen, then a 
   await bar.getByText('Preparing application').waitFor();
   await shot('progress-bar-after-back');
   // It follows to other tabs.
-  await tab('Pipeline').click();
+  await tab('Track').click();
   await bar.waitFor();
   // Done: the bar goes, a pop-up links to it, the bell counts it.
   await bar.waitFor({ state: 'detached', timeout: 120_000 });
@@ -264,8 +278,30 @@ await step('Prepare my top matches on the Apply tab prepares the rest for approv
   await shot('apply-hub-after');
 });
 
+await step('a job board listing that refuses apps still opens in the Browser, as the scan saved it', async () => {
+  const id = sql("SELECT id FROM jobs WHERE company = 'Quietfirm Talent'");
+  assert.ok(id, 'the second Adzuna job is on the board');
+  await page.goto(`/browser/${id}`);
+  await page.getByTestId('saved-banner').waitFor({ timeout: 90_000 });
+  await page.getByTestId('reader-frame').waitFor();
+  assert.match(await page.getByTestId('reader-frame').getAttribute('srcdoc'), /Boolean sourcing/);
+  await shot('browser-saved-posting');
+});
+
+await step('the Resume page makes the master resume and lists the tailored one', async () => {
+  await tab('Apply').click();
+  await page.getByTestId('section-tabs').getByRole('link', { name: 'Resume' }).click();
+  await page.waitForURL(/\/resume$/);
+  await page.getByTestId('master-resume').waitFor();
+  const file = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  assert.match((await file).suggestedFilename(), /\.pdf$/);
+  assert.ok(await page.getByTestId('saved-resume').count() >= 1, 'the resume Apply with AI made is listed');
+  await shot('resume');
+});
+
 await step('no screen scrolls sideways and no script errors along the way', async () => {
-  for (const path of ['/', '/jobs', '/apply', '/pipeline', '/more', '/profile', '/settings', '/notifications']) {
+  for (const path of ['/', '/jobs', '/apply', '/resume', '/pipeline', '/more', '/profile', '/settings', '/notifications']) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
     const w = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);

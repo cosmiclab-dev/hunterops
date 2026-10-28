@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut, Radar, Settings } from 'lucide-react';
-import { MAIN, MORE, MORE_TAB, type Item } from '@/components/nav-items';
+import { GROUPS, groupOf, type Item } from '@/components/nav-items';
 import { ThemeButton } from '@/components/theme-toggle';
 import { BellLink } from '@/components/activity';
 import { cn } from '@/lib/utils';
@@ -41,7 +41,8 @@ async function signOut() {
   window.location.href = '/login';
 }
 
-// Fixed left sidebar on laptops; top bar plus a five-tab bottom bar on phones.
+// Fixed left sidebar on laptops; top bar plus a five-tab bottom bar on phones:
+// Home, Jobs, Apply, Track and Me.
 export function Nav() {
   const pathname = usePathname();
   if (pathname === '/login') return null;
@@ -52,15 +53,13 @@ export function Nav() {
           <Link href="/" aria-label="HunterOps home"><Logo /></Link>
           <BellLink className="ml-auto" />
         </div>
-        <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-2" aria-label="Main">
-          <div className="flex flex-col gap-0.5">
-            <p className="label-caps px-3.5 pb-1.5">Workspace</p>
-            {MAIN.map((i) => <SideLink key={i.href} item={i} pathname={pathname} />)}
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <p className="label-caps px-3.5 pb-1.5">Tools</p>
-            {MORE.map((i) => <SideLink key={i.href} item={i} pathname={pathname} />)}
-          </div>
+        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-2" aria-label="Main">
+          {GROUPS.map((g) => (
+            <div key={g.id} className="flex flex-col gap-0.5">
+              {g.items.length > 1 && <p className="label-caps px-3.5 pb-1.5">{g.label}</p>}
+              {g.items.map((i) => <SideLink key={i.href} item={i} pathname={pathname} />)}
+            </div>
+          ))}
         </nav>
         <div className="flex items-center justify-between border-t border-black/[0.06] px-3 py-3 dark:border-white/[0.08]">
           <ThemeButton />
@@ -82,18 +81,41 @@ export function Nav() {
       {/* Liquid Glass tab bar: a floating capsule above the home indicator. */}
       <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),10px)] lg:hidden" aria-label="Tabs">
         <div className="glass-float mx-auto grid max-w-md grid-cols-5 rounded-full p-1.5">
-          {[...MAIN, MORE_TAB].map((i) => {
-            const on = i.match(pathname);
+          {GROUPS.map((g) => {
+            const on = g.items.some((i) => i.match(pathname));
             return (
-              <Link key={i.href} href={i.href} className={cn('flex h-[54px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-full transition-[transform,colors] active:scale-95', on ? 'bg-white/70 text-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.9),0_1px_3px_rgb(0_0_0/0.08)] dark:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]' : 'text-foreground/75')} aria-current={on ? 'page' : undefined}>
-                <i.icon className="h-[21px] w-[21px]" strokeWidth={on ? 2.3 : 1.9} />
-                <span className="max-w-full truncate px-0.5 text-[10px] font-semibold leading-3 tracking-normal">{i.label}</span>
+              <Link key={g.id} href={g.items[0].href} className={cn('flex h-[54px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-full transition-[transform,colors] active:scale-95', on ? 'bg-white/70 text-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.9),0_1px_3px_rgb(0_0_0/0.08)] dark:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]' : 'text-foreground/75')} aria-current={on ? 'page' : undefined}>
+                <g.icon className="h-[21px] w-[21px]" strokeWidth={on ? 2.3 : 1.9} />
+                <span className="max-w-full truncate px-0.5 text-[10px] font-semibold leading-3 tracking-normal">{g.label}</span>
               </Link>
             );
           })}
         </div>
       </nav>
     </>
+  );
+}
+
+// The pages of one place (Jobs, Apply, Track, Me), one tap apart, like an
+// iOS segmented control. Home has a single page and shows none.
+function SectionTabs({ pathname }: { pathname: string }) {
+  const group = groupOf(pathname);
+  // A single job (/jobs/…, /apply/…, /browser/…) has its own back link.
+  if (!group || group.items.length < 2 || pathname.split('/').filter(Boolean).length > 1) return null;
+  return (
+    <nav aria-label={`${group.label} pages`} className="scroll-x mb-5 flex lg:mb-7" data-testid="section-tabs">
+      <div className="inline-flex shrink-0 gap-1 rounded-full bg-foreground/[0.06] p-1">
+        {group.items.map((i) => {
+          const on = i.match(pathname);
+          return (
+            <Link key={i.href} href={i.href} aria-current={on ? 'page' : undefined} className={cn('inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors', on ? 'bg-background text-foreground shadow-[0_1px_3px_rgb(0_0_0/0.1)] dark:bg-white/[0.14]' : 'text-foreground/70 hover:text-foreground')}>
+              <i.icon className="h-4 w-4" />
+              {i.label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -105,7 +127,10 @@ export function Frame({ children }: { children: React.ReactNode }) {
   const wide = /^\/(browser|pipeline)/.test(pathname);
   return (
     <div className="min-w-0 lg:pl-[264px]">
-      <main className={cn('mx-auto w-full min-w-0 px-4 pb-48 pt-6 md:px-6 lg:px-10 lg:pb-14 lg:pt-10', wide ? 'max-w-none' : 'max-w-6xl')}>{children}</main>
+      <main className={cn('mx-auto w-full min-w-0 px-4 pb-48 pt-6 md:px-6 lg:px-10 lg:pb-14 lg:pt-10', wide ? 'max-w-none' : 'max-w-6xl')}>
+        <SectionTabs pathname={pathname} />
+        {children}
+      </main>
     </div>
   );
 }

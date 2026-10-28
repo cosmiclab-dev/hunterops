@@ -59,9 +59,10 @@ describe('Career-Ops scores', () => {
   const args = { profileText: 'Senior recruiter, 4.5 years.', targets: ['Senior Recruiter'], job: { title: 'TA Specialist', company: 'ULOOK', location: 'Bengaluru', salary: null, url: 'https://x.test', description: 'Hire engineers. '.repeat(30) }, grill: null, signals: [], research: [], storyTitles: [] };
 
   it('asks for the score on its own when the full answer came without one', async () => {
-    const fetch = vi.fn()
-      .mockResolvedValueOnce(reply(JSON.stringify({ summary: { tldr: 'Recruiter role' }, dimensions: { cv: null }, score: null, verdict: { apply: false, headline: '', why: '' } })))
-      .mockResolvedValueOnce(reply(JSON.stringify({ dimensions: { cv: 4, northStar: 4, comp: 3, culture: 3, redFlags: 4 }, score: 3.9, verdict: { apply: true, headline: 'Worth applying', why: 'Strong sourcing match' } })));
+    // The short score request runs alongside the full one; answer each by its prompt.
+    const fetch = vi.fn().mockImplementation(async (_url: string, init: { body: string }) => (init.body.includes('You score ONE job')
+      ? reply(JSON.stringify({ dimensions: { cv: 4, northStar: 4, comp: 3, culture: 3, redFlags: 4 }, score: 3.9, verdict: { apply: true, headline: 'Worth applying', why: 'Strong sourcing match' } }))
+      : reply(JSON.stringify({ summary: { tldr: 'Recruiter role' }, dimensions: { cv: null }, score: null, verdict: { apply: false, headline: '', why: '' } }))));
     vi.stubGlobal('fetch', fetch);
     const { evaluation } = await runEvaluation(cfg, args);
     expect(evaluation.score).toBe(3.9);
@@ -69,8 +70,18 @@ describe('Career-Ops scores', () => {
     expect(evaluation.summary.tldr).toBe('Recruiter role');
   });
 
+  it('keeps the score when the full answer runs out of time', async () => {
+    const fetch = vi.fn().mockImplementation(async (_url: string, init: { body: string }) => {
+      if (init.body.includes('You score ONE job')) return reply(JSON.stringify({ dimensions: { cv: 4, northStar: 4, comp: 3, culture: 3, redFlags: 4 }, score: 4.1, verdict: { apply: true, headline: 'Worth applying', why: 'Sourcing match' } }));
+      throw Object.assign(new Error('The operation was aborted'), { name: 'AbortError' });
+    });
+    vi.stubGlobal('fetch', fetch);
+    const { evaluation } = await runEvaluation(cfg, args);
+    expect(evaluation.score).toBe(4.1);
+  });
+
   it('never returns an evaluation without a score', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply(JSON.stringify({ summary: { tldr: 'x' }, score: null }))));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => reply(JSON.stringify({ summary: { tldr: 'x' }, score: null }))));
     await expect(runEvaluation(cfg, args)).rejects.toThrow(/did not return a score/);
   });
 });

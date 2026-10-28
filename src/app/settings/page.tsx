@@ -9,7 +9,7 @@ import { SelfTest } from '@/components/self-test';
 
 export const dynamic = 'force-dynamic';
 
-export default async function SettingsPage() {
+export default async function SettingsPage({ searchParams }: { searchParams: { g?: string } }) {
   if ((await prisma.company.count()) === 0) await seedCompanies();
   const [settings, companies] = await Promise.all([
     loadSettings(),
@@ -23,6 +23,7 @@ export default async function SettingsPage() {
       </div>
       <SettingsForm
         selfTest={<SelfTest />}
+        initialGroup={searchParams.g}
         initial={publicSettings(settings)}
         providers={PROVIDERS}
         appSecret={hasAppSecret()}

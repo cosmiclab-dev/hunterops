@@ -84,3 +84,15 @@ describe('in-app Browser: reader view', () => {
     expect(atsRef('https://www.naukri.com/job-listings-123')).toBeNull();
   });
 });
+
+describe('Lever application form', () => {
+  it('reads the question, not the upload status and hints around it', () => {
+    const fields = formFields(`<form>
+      <label class="application-question"><div class="application-label">Resume/CV<span class="required">✱</span></div>
+        <div class="application-field"><input type="file" name="resume"><span>ATTACH RESUME/CV</span><span>Couldn't auto-read resume.</span><span>Analyzing resume...</span><span>Success!</span></div></label>
+      <label class="application-question"><div class="application-label">Full name<span class="required">✱</span></div><input type="text" name="name"></label>
+      <label class="application-question"><div class="application-label">Current location</div><input type="text" name="location"><div class="dropdown-results">No location found. Try entering a different location</div><span>Loading</span></label>
+    </form>`);
+    expect(fields.map((f) => [f.label, f.required])).toEqual([['Resume/CV', true], ['Full name', true], ['Current location', false]]);
+  });
+});
