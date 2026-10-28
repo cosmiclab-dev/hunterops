@@ -4,7 +4,7 @@
   "private": true,
   "description": "HunterOps v2: job search cockpit on Next.js 14, Prisma and Neon.",
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "scripts": {
     "dev": "next dev",
