@@ -166,7 +166,8 @@ export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOp
   try {
     data = JSON.parse(raw);
   } catch {
-    throw new HttpError(502, 'The AI provider returned a non-JSON response.');
+    console.error('[llm] non-JSON body', res.status, res.headers.get('content-type'), raw.slice(0, 300));
+    throw new HttpError(502, `The AI provider returned a non-JSON response (HTTP ${res.status}): "${upstreamMessage(raw).slice(0, 120) || 'empty'}"`);
   }
   const content = readContent(cfg, data);
   if (typeof content !== 'string' || !content.trim()) {
