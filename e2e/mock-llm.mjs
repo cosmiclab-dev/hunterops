@@ -82,6 +82,19 @@ function answer(system, messages) {
       phone: 'After Capgemini I took a planned break from November 2025. I spent it learning AI sourcing tools and mapping the Bengaluru GCC market. The upside for you is that I can start right away. Most candidates you speak to will be on 60 to 90 days notice.',
     });
   }
+  if (/You coach a senior talent-acquisition professional/.test(system)) {
+    const user = messages.find((m) => m.role === 'user')?.content || '';
+    const firstJob = user.match(/ACTIVE JOBS:\n([0-9a-f-]{36}) \|/)?.[1] || '';
+    const long = 'Hi Meera, I am a Senior Recruiter with five years of tech hiring at Capgemini, based in Bengaluru and able to join immediately. I hired 120 engineers in 12 months for a GCC ramp. Happy to share my CV if this fits what you need for the TA Partner role right now, and to talk through how I would run the Bengaluru pipeline.';
+    return JSON.stringify({
+      summary: 'Mock coaching output.',
+      sections: [
+        { heading: 'Main', items: [{ title: 'Point', text: 'Use the 120-engineer ramp story.', tag: 'inferred from JD' }, { text: long, copy: true }] },
+      ],
+      titles: ['Talent Partner', 'TA Business Partner'],
+      kind: 'interview_invite', jobId: firstJob, status: firstJob ? 'INTERVIEW' : '',
+    });
+  }
   if (/full A-H evaluation/.test(system)) {
     return JSON.stringify({
       archetype: { name: 'Tech hiring partner', targeted: true, why: 'Senior TA partner for a GCC.' },

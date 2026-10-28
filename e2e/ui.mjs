@@ -166,6 +166,24 @@ await shot('d07b-evaluation');
 await page.reload();
 await page.getByTestId('eval-score').waitFor();
 ok('job page: Career-Ops A-H evaluation runs and opens by default afterwards');
+await page.getByRole('tab', { name: 'Prep' }).click();
+await page.getByRole('radio', { name: /Who to contact/ }).click();
+await page.getByRole('button', { name: 'Run who to contact' }).click();
+await page.getByTestId('mode-report').waitFor({ timeout: 60_000 });
+await page.getByRole('radio', { name: /Read an offer letter/ }).click();
+assert.equal(await page.getByRole('button', { name: 'Run read an offer letter' }).isDisabled(), true);
+await shot('d07c-prep');
+await page.goto(`${BASE}/insights`);
+await page.getByRole('radio', { name: /Adjacent job titles/ }).click();
+await page.getByRole('button', { name: 'Run adjacent job titles' }).click();
+await page.getByRole('button', { name: 'Talent Partner' }).click();
+await page.getByRole('button', { name: 'Add 1 to job feed' }).click();
+await page.getByText('Added 1 titles to your job feed').waitFor();
+await page.getByRole('tab', { name: /Story bank/ }).click();
+await page.getByTestId('story-bank').waitFor();
+await shot('d07d-insights');
+ok('Prep tab runs a tool; Insights adds a suggested title to the feed; story bank opens');
+await page.goto(jobUrl);
 
 await page.getByRole('tab', { name: 'Email' }).click();
 await page.fill('#to', 'lead@beta.example');
@@ -254,7 +272,7 @@ await page.context().close();
 // ---------------- iPhone ----------------
 const phone = await open({ ...devices['iPhone 14'] });
 const pshot = (name) => phone.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
-for (const [path, name] of [['/', 'p00-home'], ['/discover', 'p01-discover'], ['/pipeline', 'p02-pipeline'], ['/browser', 'p03-browser'], [`/browser/${jobId}`, 'p04-browser-job'], ['/mailroom', 'p05-mailroom'], ['/jobs?view=all', 'p06-jobs'], ['/profile', 'p07-profile'], ['/settings', 'p08-settings'], ['__job__', 'p09-evaluation']]) {
+for (const [path, name] of [['/', 'p00-home'], ['/discover', 'p01-discover'], ['/pipeline', 'p02-pipeline'], ['/browser', 'p03-browser'], [`/browser/${jobId}`, 'p04-browser-job'], ['/mailroom', 'p05-mailroom'], ['/jobs?view=all', 'p06-jobs'], ['/profile', 'p07-profile'], ['/settings', 'p08-settings'], ['__job__', 'p09-evaluation'], ['/insights', 'p10-insights']]) {
   await phone.goto(path === '__job__' ? jobUrl : BASE + path);
   await phone.waitForLoadState('networkidle');
   await noSideScroll(phone, `phone ${path}`);
