@@ -18,6 +18,9 @@ const sql = (q) => execFileSync('psql', [process.env.DATABASE_URL, '-tAc', q]).t
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ ...devices['iPhone 14'], baseURL: BASE });
 const page = await ctx.newPage();
+// Keep the run on this machine: the Apply-form view frames the employer's real
+// form (Greenhouse), whose own scripts fail for a mock job and are not the app's.
+await ctx.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (r) => r.abort());
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 let n = 0;
@@ -197,6 +200,16 @@ await step('Apply with AI on an Adzuna job finds the employer’s own posting an
   await page.getByTestId('apply-evaluation').waitFor();
   assert.ok(!labels.some((l) => /country-selector/.test(l)));
   await shot('apply-adzuna');
+});
+
+await step('open the Adzuna job in the Browser: the employer’s own posting and form open instead of the blocked page', async () => {
+  const jobId = page.url().split('/apply/')[1].split(/[?#]/)[0];
+  await page.goto(`/browser/${jobId}`);
+  await page.getByTestId('employer-banner').waitFor({ timeout: 60_000 });
+  await page.getByTestId('employer-banner').getByText(/hides the application form/).waitFor();
+  assert.equal(await page.getByTestId('frame-blocked').count(), 0);
+  await page.getByRole('tab', { name: 'Apply form', selected: true }).waitFor();
+  await shot('browser-employer-form');
 });
 
 await step('start Apply, press back: the progress stays on every screen, then a pop-up and the bell say it is ready', async () => {

@@ -101,6 +101,8 @@ model Job {
   locationClass  String?    @map("location_class")
   workMode       WorkMode   @default(UNKNOWN) @map("work_mode")
   url            String     @unique
+  // The same job on the employer's own site, when it came from a job board that hides the form.
+  employerUrl    String?    @map("employer_url")
   postedAt       DateTime?  @map("posted_at")
   firstSeenAt    DateTime   @default(now()) @map("first_seen_at")
   description    String?
