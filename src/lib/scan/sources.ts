@@ -27,7 +27,11 @@ type Json = any;
 const UA = 'HunterOps/2.0 (personal job search; +https://github.com/cosmiclab-dev/hunterops)';
 export const FETCH_TIMEOUT_MS = 12_000;
 
+// Test hook: e2e points every job API at a local mock, so a run never depends on the live sites.
+const testBase = (url: string) => (process.env.ATS_API_BASE ? url.replace(/^https:\/\/[^/]+/, process.env.ATS_API_BASE) : url);
+
 export async function getJson(url: string, init: RequestInit = {}): Promise<Json> {
+  url = testBase(url);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -235,6 +239,17 @@ async function workable(c: CompanyRow): Promise<Posting[]> {
     description: htmlToText(j.description),
     salary: null,
   }));
+}
+
+// Workday's job list has no descriptions; each posting's detail call has one.
+export async function workdayDescription(postingUrl: string): Promise<string | null> {
+  const u = new URL(postingUrl);
+  const parts = u.pathname.split('/').filter(Boolean);
+  const rest = /^[a-z]{2}-[A-Z]{2}$/.test(parts[0] || '') ? parts.slice(1) : parts;
+  const j = rest.indexOf('job');
+  if (!rest[0] || j < 1) return null;
+  const d = await getJson(`https://${u.host}/wday/cxs/${u.host.split('.')[0]}/${rest[0]}/${rest.slice(j).join('/')}`);
+  return htmlToText(d.jobPostingInfo?.jobDescription) || null;
 }
 
 export const ATS_FETCHERS: Record<string, (c: CompanyRow, ctx: ScanCtx) => Promise<Posting[]>> = { greenhouse, lever, ashby, smartrecruiters, workday, recruitee, workable };

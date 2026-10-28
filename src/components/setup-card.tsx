@@ -67,7 +67,7 @@ export function SetupCard({ steps }: { steps: Step[] }) {
               </>
             )}
             {!s.done && s.id === 'ai' && <Button size="sm" variant="outline" asChild><Link href="/settings">Open Settings</Link></Button>}
-            {!s.done && s.id === 'prefs' && <Button size="sm" variant="outline" asChild><Link href="/profile">Add in Profile</Link></Button>}
+            {!s.done && s.id === 'prefs' && <Button size="sm" variant="outline" asChild><Link href="/profile#p-pay">Add in Profile</Link></Button>}
             {!s.done && s.id === 'search' && <Button size="sm" variant="outline" asChild><Link href="/settings#search">Add key</Link></Button>}
             {!s.done && s.id === 'scan' && <ScanButton label="Run first scan" />}
           </li>

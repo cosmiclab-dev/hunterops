@@ -16,5 +16,11 @@ node e2e/mock-web.mjs & WEB=$!
 ./node_modules/.bin/next start -p 3100 >/tmp/hunterops-e2e-server.log 2>&1 & APP=$!
 trap 'fuser -k 3100/tcp >/dev/null 2>&1; kill $LLM $SMTP $WEB $APP 2>/dev/null || true' EXIT
 for i in $(seq 1 60); do curl -sf http://localhost:3100/api/health >/dev/null && break; sleep 1; done
-node e2e/run.mjs
-node e2e/ui.mjs
+if [ -z "${JOURNEY_ONLY:-}" ]; then node e2e/run.mjs; node e2e/ui.mjs; fi
+# The user journey starts from an empty app, with a few job boards switched on.
+kill $WEB $APP 2>/dev/null || true; fuser -k 3100/tcp >/dev/null 2>&1 || true; sleep 1
+MOCK_BOARDS=1 node e2e/mock-web.mjs & WEB=$!
+npx prisma migrate reset --force --skip-generate --skip-seed >/dev/null
+./node_modules/.bin/next start -p 3100 >>/tmp/hunterops-e2e-server.log 2>&1 & APP=$!
+for i in $(seq 1 60); do curl -sf http://localhost:3100/api/health >/dev/null && break; sleep 1; done
+node e2e/journey.mjs

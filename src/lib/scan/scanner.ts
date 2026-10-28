@@ -5,7 +5,7 @@ import { prisma } from '../db';
 import { saveInternal, type Settings } from '../settings';
 import { clip, csv } from '../utils';
 import { classifyLocation, detectWorkMode, LOCATION_CLASSES, type LocationClass } from '../location';
-import { ATS_FETCHERS, BOARD_FETCHERS, type Posting, type ScanCtx } from './sources';
+import { ATS_FETCHERS, BOARD_FETCHERS, workdayDescription, type Posting, type ScanCtx } from './sources';
 import { RETIRED_COMPANIES, SEED_COMPANIES, SEED_VERSION } from './seed-companies';
 import { grill } from '../modules/grill';
 import { loadProfile, profileIsEmpty, toGrillProfile } from '../profile';
@@ -142,6 +142,38 @@ export async function syncSeedCompanies(settings: Settings) {
   return seedCompanies();
 }
 
+// New Workday matches get their full description before they are scored, so
+// the Grill reads the JD rather than just the title.
+async function addMissingDescriptions(rows: Kept[], until: number) {
+  const missing = rows.filter((r) => r.source === 'workday' && !r.description);
+  if (!missing.length) return;
+  const known = new Set((await prisma.job.findMany({ where: { url: { in: missing.map((r) => r.url) } }, select: { url: true } })).map((j) => j.url));
+  const todo = missing.filter((r) => !known.has(r.url)).slice(0, 30);
+  await pool(todo.map((r) => async () => {
+    r.description = await workdayDescription(r.url);
+  }), until);
+}
+
+// Jobs saved before descriptions were fetched get theirs, a few per scan, and are re-scored.
+async function backfillDescriptions(until: number) {
+  const jobs = await prisma.job.findMany({ where: { source: 'workday', description: null, status: { not: 'DISMISSED' } }, take: 10, select: { id: true, url: true } });
+  if (!jobs.length || Date.now() > until - PER_SOURCE_RESERVE_MS) return 0;
+  const profile = await loadProfile();
+  const gp = profile && !profileIsEmpty(profile) ? toGrillProfile(profile) : null;
+  let done = 0;
+  await pool(jobs.map((j) => async () => {
+    const description = await workdayDescription(j.url);
+    if (!description) return;
+    const job = await prisma.job.update({ where: { id: j.id }, data: { description: clip(description, 20000) } });
+    if (gp) {
+      const g = grill(gp, job);
+      await prisma.job.update({ where: { id: j.id }, data: { grillScore: g.score, grillBreakdown: g as unknown as Prisma.InputJsonValue, grilledAt: new Date() } });
+    }
+    done++;
+  }), until);
+  return done;
+}
+
 type TaskResult = { name: string; fetched: number; kept: Kept[]; note?: string };
 
 /**
@@ -219,7 +251,9 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
       if (r.note) errors.push({ source: label, error: r.note });
     }
   });
+  await addMissingDescriptions(rows, deadline + 20_000);
   const inserted = rows.length ? await insertPostings(rows) : 0;
+  const backfilled = await backfillDescriptions(deadline + 30_000);
 
   const summary = {
     run_id: run.id,
@@ -229,6 +263,7 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
     matched: rows.length,
     inserted,
     already_on_board: Math.max(0, new Set(rows.map((r) => r.url)).size - inserted),
+    descriptions_added: backfilled,
     errors: errors.slice(0, 50),
     boards: scanBoards,
     ms: Date.now() - started,
