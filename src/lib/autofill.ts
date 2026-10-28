@@ -3,7 +3,7 @@
 // The person copies each answer into the real form and presses Submit there.
 import type { FormField } from './html';
 import type { ProfileInput } from './profile';
-import { profileToText } from './profile';
+import { applicationFacts, profileToText } from './profile';
 import type { ChatMessage, LlmConfig } from './llm/client';
 import { antiSlopInstruction } from './modules/anti-slop';
 import { writeClean } from './writer';
@@ -44,7 +44,7 @@ const RULES: Rule[] = [
   [/phone( number)?\b(?! screen| interview| call)|mobile|contact number/i, (p) => p.phone],
   [/linked\s*in/i, (p) => p.linkedin],
   [/portfolio|website|personal (site|url)|github/i, (p) => p.portfolio],
-  [/expected (ctc|salary|compensation|pay)|salary expectation|desired (salary|pay)/i, (p) => lpa(p.expectedSalaryLpa), 'Your expected CTC from Profile.', true],
+  [/expected (ctc|salary|compensation|pay)|(salary|compensation|pay|ctc) expectations?|desired (salary|pay|compensation)/i, (p) => lpa(p.expectedSalaryLpa), 'Your expected CTC from Profile.', true],
   [/current (ctc|salary|compensation)|present (ctc|salary)/i, (p) => lpa(p.currentCtcLpa), undefined, true],
   [/notice period|when can you (start|join)|earliest start|availability to join|joining date/i, (p) => p.noticePeriod, undefined, true],
   [/current (company|employer|organi[sz]ation)|most recent (company|employer)|^company$|^org$/i, (p) => p.experience[0]?.company || ''],
@@ -55,6 +55,9 @@ const RULES: Rule[] = [
   [/school|university|college/i, (p) => p.education[0]?.school || ''],
   [/degree|qualification/i, (p) => p.education[0]?.degree || ''],
 ];
+
+// A placeholder the model left for the person: [X], [Name], ₹[X] lakh.
+export const SLOT = /\[(?!Check\])[A-Za-z][A-Za-z ]{0,20}\]/;
 
 const FREE_TEXT = /why|tell us|describe|cover letter|additional information|anything else|motivat|interest(ed)? in|about yourself|summary|example of|how would you/i;
 
@@ -93,7 +96,9 @@ export function mapField(f: FormField, p: ProfileInput): Answer {
 function questionMessages(a: { questions: Answer[]; company: string; role: string; jd: string; profile: ProfileInput }): ChatMessage[] {
   const system = `You fill in job application questions for the candidate, in the first person, from their profile only.
 Rules:
-- Free-text answers: 40 to 120 words, specific to the company and role, using real facts from the profile. Never invent numbers, employers or tools; write [X] where a figure is needed and missing.
+- Free-text answers: 40 to 120 words, specific to the company and role, using real facts from the profile. Never invent numbers, employers or tools.
+- These answers are pasted into the real form as they are: never write placeholders such as [X], [Name] or [Company]. If a figure is missing, write the sentence without it.
+- Pay, notice period, location and commute questions: answer from the APPLICATION FACTS. Give pay as the expected CTC in LPA. If the job is outside the places the candidate is open to, say so plainly (for example "No, I am based in Bengaluru").
 - For a question with options, reply with exactly one of the options.
 - For a yes/no eligibility question you cannot answer from the profile, reply "[Check]".
 - ${antiSlopInstruction()}
@@ -104,6 +109,7 @@ Reply with one JSON object and nothing else: { "answers": { "<key>": "<answer>" 
     `Job description (excerpt):\n"""\n${a.jd.slice(0, 3500)}\n"""`,
     `Questions:\n${a.questions.map((q) => `- key "${q.key}": ${q.label}${q.options?.length ? ` (options: ${q.options.join(' | ')})` : ''}`).join('\n')}`,
     `Candidate profile:\n"""\n${profileToText(a.profile).slice(0, 6000)}\n"""`,
+    `APPLICATION FACTS:\n${applicationFacts(a.profile)}`,
   ].join('\n\n');
   return [{ role: 'system', content: system }, { role: 'user', content: user }];
 }
@@ -125,6 +131,8 @@ export async function buildAnswerSheet(cfg: LlmConfig | null, a: {
       const v = String(got[q.key] ?? '').trim().slice(0, 2000);
       q.value = v;
       if (!v) q.source = 'you';
+      // A slot left in the text would be pasted into the form as it is.
+      else if (SLOT.test(v)) Object.assign(q, { source: 'you', note: 'Fill in the part in [brackets] before you paste this.' });
     }
   }
   for (const q of answers) if (q.source === 'ai' && !q.value) q.source = 'you';

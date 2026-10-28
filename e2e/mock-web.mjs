@@ -112,6 +112,20 @@ http.createServer((req, res) => {
         ],
       });
     }
+    if (BOARDS && p === '/v1/boards/figma/jobs/9102') {
+      return send(res, 200, {
+        id: 9102, title: 'Talent Acquisition Partner, GTM', company_name: 'Figma', absolute_url: 'https://job-boards.greenhouse.io/figma/jobs/9102',
+        location: { name: 'Remote - India' }, first_published: new Date(Date.now() - 3 * 3600_000).toISOString(),
+        content: '&lt;p&gt;Partner with sales and marketing leaders to hire account executives, solutions engineers and marketers across India.&lt;/p&gt;&lt;h3&gt;Requirements&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;5+ years of full-cycle recruiting, including GTM roles&lt;/li&gt;&lt;li&gt;LinkedIn Recruiter and Boolean sourcing&lt;/li&gt;&lt;li&gt;Greenhouse&lt;/li&gt;&lt;li&gt;Offer negotiation and stakeholder management&lt;/li&gt;&lt;/ul&gt;&lt;p&gt;Remote within India.&lt;/p&gt;',
+        questions: [
+          { label: 'First Name', required: true, fields: [{ name: 'first_name', type: 'input_text' }] },
+          { label: 'Last Name', required: true, fields: [{ name: 'last_name', type: 'input_text' }] },
+          { label: 'Email', required: true, fields: [{ name: 'email', type: 'input_text' }] },
+          { label: 'Resume/CV', required: true, fields: [{ name: 'resume', type: 'input_file' }] },
+          { label: 'Which GTM roles have you hired for?', required: true, fields: [{ name: 'question_12', type: 'textarea' }] },
+        ],
+      });
+    }
     // Workday: the list has no descriptions; the detail call has one.
     if (BOARDS && p === '/wday/cxs/amat/External/jobs' && req.method === 'POST') {
       const body = JSON.parse(raw || '{}');

@@ -2,7 +2,7 @@ import { HttpError, ok, route } from '@/lib/http';
 import { extractText } from '@/lib/extract';
 import { chatJson, llmConfig } from '@/lib/llm/client';
 import { parseResumeMessages } from '@/lib/prompts';
-import { loadProfile, normalizeProfile, profileIsEmpty, saveProfile } from '@/lib/profile';
+import { inferNoticePeriod, loadProfile, normalizeProfile, profileFillSummary, profileIsEmpty, saveProfile } from '@/lib/profile';
 import { regrillQuietly } from '@/lib/regrill';
 import { heuristicProfile } from '@/lib/resume-heuristic';
 import { loadSettings } from '@/lib/settings';
@@ -48,13 +48,14 @@ export const POST = route(async (req: Request) => {
     warning = `The AI could not read the CV (${(err as Error).message}) so the basics were filled in without it. Check Experience on the Profile page.`;
     draft = normalizeProfile(heuristicProfile(text));
   }
-  if (!save) return ok({ draft, model, chars: text.length, warning });
+  if (!draft.noticePeriod) draft.noticePeriod = inferNoticePeriod(draft.experience);
+  if (!save) return ok({ draft, model, chars: text.length, warning, ...profileFillSummary(draft) });
   // Keep job-application facts the person already entered.
   const prev = await loadProfile();
   const merged = prev && !profileIsEmpty(prev)
-    ? { ...draft, expectedSalaryLpa: prev.expectedSalaryLpa, currentCtcLpa: prev.currentCtcLpa, noticePeriod: prev.noticePeriod, acceptRemote: prev.acceptRemote, acceptHybrid: prev.acceptHybrid, onsiteCities: prev.onsiteCities }
+    ? { ...draft, expectedSalaryLpa: prev.expectedSalaryLpa ?? draft.expectedSalaryLpa, currentCtcLpa: prev.currentCtcLpa ?? draft.currentCtcLpa, noticePeriod: prev.noticePeriod || draft.noticePeriod, acceptRemote: prev.acceptRemote, acceptHybrid: prev.acceptHybrid, onsiteCities: prev.onsiteCities }
     : draft;
   const profile = await saveProfile(merged);
   const scored = profileIsEmpty(profile) ? { grilled: 0, warning: null } : await regrillQuietly();
-  return ok({ draft: profile, saved: true, grilled: scored.grilled, model, chars: text.length, warning: warning ?? scored.warning });
+  return ok({ draft: profile, saved: true, grilled: scored.grilled, model, chars: text.length, warning: warning ?? scored.warning, ...profileFillSummary(profile) });
 });

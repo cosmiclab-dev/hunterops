@@ -11,4 +11,4 @@ node e2e/mock-llm.mjs & LLM=$!
 ./node_modules/.bin/next start -p 3100 >/tmp/hunterops-e2e-server.log 2>&1 & APP=$!
 trap 'kill $LLM $APP 2>/dev/null || true' EXIT
 for i in $(seq 1 60); do curl -sf http://localhost:3100/api/health >/dev/null && break; sleep 1; done
-node e2e/live-journey.mjs
+node e2e/live-journey.mjs || { echo '--- app server log (last 80 lines) ---'; grep -v '^\s*$' /tmp/hunterops-e2e-server.log | tail -80; exit 1; }

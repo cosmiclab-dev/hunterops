@@ -5,7 +5,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 const store = new AsyncLocalStorage<{ ends: number }>();
 
 // Requests may run 300 s on Vercel; this leaves room to save and answer.
-export const REQUEST_BUDGET_MS = 280_000;
+export const REQUEST_BUDGET_MS = Number(process.env.REQUEST_BUDGET_MS) || 280_000;
 
 export const withBudget = <T>(fn: () => Promise<T>, ms = REQUEST_BUDGET_MS) => store.run({ ends: Date.now() + ms }, fn);
 

@@ -10,6 +10,7 @@ import { NumberInput } from '@/components/ui/number-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { api } from '@/lib/api-client';
+import { toast } from '@/lib/toast';
 import type { ProfileInput } from '@/lib/profile';
 
 const EMPTY: ProfileInput = {
@@ -69,12 +70,14 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
     try {
       const form = new FormData();
       form.append('file', f);
-      const { draft, model, chars, warning } = await api<{ draft: ProfileInput; model: string | null; chars: number; warning: string | null }>('/api/profile/import', { method: 'POST', body: form });
-      setP({ ...draft, acceptRemote: p.acceptRemote, acceptHybrid: p.acceptHybrid, onsiteCities: p.onsiteCities, expectedSalaryLpa: p.expectedSalaryLpa, currentCtcLpa: p.currentCtcLpa, noticePeriod: p.noticePeriod });
+      const { draft, model, chars, warning, filled, missing } = await api<{ draft: ProfileInput; model: string | null; chars: number; warning: string | null; filled: string[]; missing: string[] }>('/api/profile/import', { method: 'POST', body: form });
+      setP({ ...draft, acceptRemote: p.acceptRemote, acceptHybrid: p.acceptHybrid, onsiteCities: p.onsiteCities, expectedSalaryLpa: p.expectedSalaryLpa ?? draft.expectedSalaryLpa, currentCtcLpa: p.currentCtcLpa ?? draft.currentCtcLpa, noticePeriod: p.noticePeriod || draft.noticePeriod });
       setSkillsText(draft.skills.join(', '));
       setLangsText((draft.languages ?? []).join(', '));
       setRev((r) => r + 1);
-      setMsg(warning || `Read ${chars.toLocaleString()} characters with ${model}. Check everything below, then Save.`);
+      // Pay and notice already in the profile stay as they are.
+      const need = missing.filter((m) => !(m === 'expected CTC' && p.expectedSalaryLpa) && !(m === 'notice period' && p.noticePeriod));
+      setMsg(warning || `Read ${chars.toLocaleString()} characters with ${model}. Filled: ${filled.join(', ') || 'nothing'}.${need.length ? ` Still needed: ${need.join(', ')}.` : ''} Check everything below, then tap Save profile.`);
     } catch (e) {
       setErr((e as Error).message);
       setMsg('');
@@ -101,6 +104,7 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
       setCitiesText(out.profile.onsiteCities.join(', '));
       setLangsText(out.profile.languages.join(', '));
       setMsg(out.warning ? `Saved. ${out.warning}` : `Saved. ${out.grilled} jobs re-scored.`);
+      toast(out.warning ? 'Profile saved.' : `Profile saved. ${out.grilled} jobs re-scored.`);
       router.refresh();
     } catch (e) {
       setErr((e as Error).message);

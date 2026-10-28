@@ -11,6 +11,9 @@ import { CopyButton } from '@/components/copy-button';
 import { IconChip, Pill } from '@/components/kit';
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { api, download } from '@/lib/api-client';
+import { useActivity } from '@/components/activity';
+import { TaskSteps } from '@/components/notifications-view';
+import { refreshActivity, toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 type Answer = { key: string; label: string; type: string; required: boolean; value: string; source: 'profile' | 'ai' | 'you'; note?: string; options?: string[] };
@@ -52,6 +55,8 @@ export function ApplyView({ jobId, job }: { jobId: string; job: { title: string;
   const [err, setErr] = useState('');
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [letter, setLetter] = useState<string | null>(null);
+  const { tasks } = useActivity();
+  const task = tasks.find((t) => t.kind === 'apply' && t.jobId === jobId && t.status === 'RUNNING');
 
   const load = useCallback(async () => {
     const { application } = await api<{ application: ApplicationRow | null }>(`/api/applications/${jobId}`);
@@ -62,7 +67,7 @@ export function ApplyView({ jobId, job }: { jobId: string; job: { title: string;
   // While it is being prepared (here or by the morning run), check back every few seconds.
   useEffect(() => {
     if (app?.status !== 'PREPARING') return;
-    const t = setInterval(() => { load().then((a) => { if (a?.status !== 'PREPARING') router.refresh(); }).catch(() => {}); }, 5000);
+    const t = setInterval(() => { load().then((a) => { if (a?.status !== 'PREPARING') router.refresh(); }).catch(() => {}); }, 3000);
     return () => clearInterval(t);
   }, [app?.status, load, router]);
 
@@ -82,6 +87,7 @@ export function ApplyView({ jobId, job }: { jobId: string; job: { title: string;
     setApp((a) => ({ ...(a || ({} as ApplicationRow)), status: 'PREPARING' }));
     try {
       await api('/api/applications', { method: 'POST', json: { jobId } });
+      refreshActivity();
     } finally {
       await load();
       router.refresh();
@@ -100,10 +106,12 @@ export function ApplyView({ jobId, job }: { jobId: string; job: { title: string;
     await saveEdits();
     await api(`/api/applications/${jobId}/approve`, { method: 'POST', json: { approve: true } });
     await load();
+    toast('Approved. Now fill the company’s form and press Submit there.');
   });
   const submitted = () => run('submitted', async () => {
     await api(`/api/applications/${jobId}/submitted`, { method: 'POST' });
     await load();
+    toast('Marked as applied. It is in Applied on your Pipeline.', { href: '/pipeline', action: 'Pipeline' });
   });
   const discard = () => run('discard', async () => {
     await api(`/api/applications/${jobId}`, { method: 'DELETE' });
@@ -141,15 +149,18 @@ export function ApplyView({ jobId, job }: { jobId: string; job: { title: string;
             </div>
             {status === 'FAILED' && app?.error && <p className="rounded-xl bg-warning/15 p-3 text-sm text-warning">Last try: {app.error}</p>}
             <Button onClick={prepare} disabled={!!busy} data-testid="prepare-application">
-              {busy === 'prepare' ? <><Loader2 className="animate-spin" /> Preparing… (up to 2 minutes)</> : <><Wand2 /> {status === 'FAILED' ? 'Try again' : 'Prepare application'}</>}
+              {busy === 'prepare' ? <><Loader2 className="animate-spin" /> Starting…</> : <><Wand2 /> {status === 'FAILED' ? 'Try again' : 'Prepare application'}</>}
             </Button>
           </div>
         )}
 
         {status === 'PREPARING' && (
-          <div className="flex items-center gap-3 py-2" role="status">
-            <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" />
-            <p className="text-sm leading-6">Preparing the answers, resume and cover letter. This takes a minute or two; you can leave this page.</p>
+          <div className="flex flex-col gap-3 py-1" role="status" data-testid="apply-progress">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" />
+              <p className="text-sm leading-6">The AI is preparing this application. It takes one to three minutes. You can leave this page: the progress stays at the bottom of every screen, and you get a notification when it is ready.</p>
+            </div>
+            {task && <TaskSteps task={task} />}
           </div>
         )}
 

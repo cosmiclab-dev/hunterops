@@ -101,3 +101,83 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@v4
         with: { name: live-screens, path: /tmp/hunterops-shots, if-no-files-found: ignore }
+
+  # The live journey again, with a real AI (GitHub Models, free with the
+  # workflow's token) instead of the stand-in: the answers, the resume, the
+  # cover letter and a scored evaluation must all come back.
+  e2e-real-ai:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: pg, POSTGRES_DB: hunterops }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Browser
+        run: |
+          npm i --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium || npx playwright install chromium
+      - name: Test environment
+        run: |
+          cat > .env.e2e <<'ENV'
+          DATABASE_URL=postgresql://postgres:pg@localhost:5432/hunterops
+          DIRECT_URL=postgresql://postgres:pg@localhost:5432/hunterops
+          APP_SECRET=ci-only-secret-0123456789abcdef0123456789
+          APP_PASSWORD=letmein
+          CRON_SECRET=cronsecret
+          ENV
+      - name: Pick a free model that answers
+        id: model
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Sent the way the app sends it; a real answer has "choices".
+          # GitHub Models first (needs the job token). Then a free keyless
+          # OpenAI-compatible service, which never gets the token.
+          while read -r base m auth; do
+            [ -z "$base" ] && continue
+            hdr=(); [ "$auth" = gh ] && hdr=(-H "Authorization: Bearer $GH_TOKEN")
+            code=$(curl -s -m 60 -D /tmp/probe.h -o /tmp/probe.json -w '%{http_code}' "$base/chat/completions" \
+              "${hdr[@]}" -H 'Content-Type: application/json' -H 'User-Agent: hunterops/2.0' \
+              -d "{\"model\":\"$m\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the word ok\"}],\"max_tokens\":5,\"stream\":false}" || true)
+            echo "$base $m -> HTTP $code: $(head -c 200 /tmp/probe.json 2>/dev/null)"
+            grep -iE '^(content-type|x-ms|x-github|server):' /tmp/probe.h 2>/dev/null | head -5 || true
+            if [ "$code" = 200 ] && grep -q '"choices"' /tmp/probe.json; then
+              echo "name=$m" >> "$GITHUB_OUTPUT"; echo "base=$base" >> "$GITHUB_OUTPUT"; echo "auth=$auth" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+          done <<'LIST'
+          https://models.github.ai/inference openai/gpt-4.1-mini gh
+          https://models.github.ai/inference deepseek/DeepSeek-V3-0324 gh
+          https://models.github.ai/inference openai/gpt-4o-mini gh
+          https://text.pollinations.ai/openai openai none
+          https://text.pollinations.ai/openai openai-fast none
+          LIST
+      - name: Live journey with the real AI
+        if: steps.model.outputs.name != ''
+        env:
+          REAL_AI_BASE: ${{ steps.model.outputs.base }}
+          REAL_AI_MODEL: ${{ steps.model.outputs.name }}
+          REAL_AI_KEY: ${{ steps.model.outputs.auth == 'gh' && secrets.GITHUB_TOKEN || 'no-key-needed' }}
+          LLM_MAX_OUTPUT_TOKENS: '8000'
+          # The keyless service allows one reply every 30 s, so calls are
+          # spaced out and Apply is given longer than on Vercel.
+          LLM_MIN_GAP_MS: ${{ steps.model.outputs.auth == 'gh' && '0' || '32000' }}
+          LLM_BUSY_RETRIES: '10'
+          REQUEST_BUDGET_MS: '1500000'
+          APPLY_WAIT_MS: '1500000'
+        run: bash e2e/e2e-live.sh
+      - name: No free model answered
+        if: steps.model.outputs.name == ''
+        run: echo "::error::No free AI model answered, so the real-AI journey could not run" && exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: real-ai-screens, path: /tmp/hunterops-shots, if-no-files-found: ignore }

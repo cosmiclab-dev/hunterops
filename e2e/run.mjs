@@ -22,6 +22,17 @@ async function call(method, path, body, { raw = false, headers = {} } = {}) {
   return { status: res.status, data };
 }
 
+// Polls until fn returns something, for work that runs in the background.
+async function until(fn, ms = 150_000) {
+  const end = Date.now() + ms;
+  for (;;) {
+    const v = await fn();
+    if (v) return v;
+    if (Date.now() > end) throw new Error('Timed out waiting for background work');
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+
 async function step(name, fn) {
   try {
     await fn();
@@ -596,9 +607,26 @@ await step('Pipeline columns: Scouted, Grilled 75+, Applied, Rejected', async ()
 await step('Apply with AI: prepared, approval pending on the Pipeline, approved, submitted by the person, Applied', async () => {
   assert.equal((await call('GET', `/api/applications/${ghJob.id}`)).data.application, null);
   const prep = await call('POST', '/api/applications', { jobId: ghJob.id });
-  assert.equal(prep.status, 201, JSON.stringify(prep.data));
-  assert.equal(prep.data.application.status, 'PENDING');
-  const got = (await call('GET', `/api/applications/${ghJob.id}`)).data.application;
+  // It answers at once and carries on in the background, step by step.
+  assert.equal(prep.status, 202, JSON.stringify(prep.data));
+  assert.equal(prep.data.application.status, 'PREPARING');
+  assert.equal((await call('POST', '/api/applications', { jobId: ghJob.id })).status, 409, 'a second tap while preparing is refused');
+  const got = await until(async () => {
+    const a = (await call('GET', `/api/applications/${ghJob.id}`)).data.application;
+    return a.status === 'PREPARING' ? null : a;
+  });
+  assert.equal(got.status, 'PENDING', got.error);
+  // The task kept every step, and a notification says it is ready.
+  const act = (await call('GET', '/api/activity')).data;
+  const task = act.tasks.find((t) => t.id === prep.data.taskId);
+  assert.equal(task.status, 'DONE', JSON.stringify(task));
+  assert.deepEqual(task.steps.map((x) => x.key), ['form', 'posting', 'answers', 'resume', 'letter', 'evaluation']);
+  assert.ok(task.steps.every((x) => x.state === 'done' || x.state === 'skipped'), JSON.stringify(task.steps));
+  assert.ok(act.unread >= 1);
+  const notes = (await call('GET', '/api/notifications')).data.notifications;
+  assert.ok(notes.some((n) => n.kind === 'ready' && n.href === `/apply/${ghJob.id}`), JSON.stringify(notes.slice(0, 3)));
+  assert.equal((await call('POST', '/api/notifications', {})).status, 200);
+  assert.equal((await call('GET', '/api/activity')).data.unread, 0);
   const by = Object.fromEntries(got.answers.map((a) => [a.key, a]));
   assert.equal(by.first_name.value, 'Divya');
   assert.ok(got.resume?.id, 'tailored resume missing');
@@ -632,7 +660,9 @@ await step('Apply with AI: prepared, approval pending on the Pipeline, approved,
   const auto = await call('POST', '/api/applications/auto');
   assert.equal(auto.status, 200, JSON.stringify(auto.data));
   assert.equal(auto.data.off, false);
-  assert.ok(auto.data.prepared.length + auto.data.failed.length <= 1);
+  assert.ok(auto.data.started.length + auto.data.failed.length <= 1);
+  // Let the background work finish before the next checks.
+  await until(async () => ((await call('GET', '/api/activity')).data.tasks.some((t) => t.status === 'RUNNING') ? null : true));
   assert.equal((await call('PUT', '/api/settings', { values: { auto_apply_count: null, auto_apply_min_score: null } })).status, 200);
 });
 

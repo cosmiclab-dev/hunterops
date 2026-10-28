@@ -44,6 +44,9 @@ export const SETTINGS: Record<string, Def> = {
   boards_scanned_at: { label: 'Boards last scanned', internal: true },
   seed_version: { label: 'Starter boards version', internal: true },
   login_lock: { label: 'Wrong passwords in a row', internal: true },
+  vapid_public: { label: 'Notification key (public)', internal: true },
+  vapid_private: { label: 'Notification key (private)', internal: true, secret: true },
+  ai_health: { label: 'Last real AI check', internal: true },
 };
 
 export type SettingKey = keyof typeof SETTINGS;
@@ -99,7 +102,9 @@ export async function saveSetting(key: string, value: string | null) {
 }
 
 export async function saveInternal(key: string, value: string) {
-  await prisma.setting.upsert({ where: { key }, create: { key, value }, update: { value } });
+  const secret = Boolean(SETTINGS[key]?.secret);
+  const stored = secret ? encrypt(value) : value;
+  await prisma.setting.upsert({ where: { key }, create: { key, value: stored, isSecret: secret }, update: { value: stored, isSecret: secret } });
 }
 
 const mask = (v: string) => (v.length <= 8 ? '••••' : `${v.slice(0, 3)}••••${v.slice(-4)}`);
