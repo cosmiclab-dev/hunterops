@@ -9,7 +9,7 @@ import { ATS_FETCHERS, BOARD_FETCHERS, type CompanyRow, type Posting, type ScanC
 import { SEED_COMPANIES } from '@/lib/scan/seed-companies';
 import { loadSettings } from '@/lib/settings';
 import { bingSearch, duckSearch, searchConfig, SEARCH_PROVIDERS, webSearch } from '@/lib/websearch';
-import { crawlerFrom, testCrawler } from '@/lib/crawl4ai';
+import { crawlerFrom, testCrawler, testHostedReader } from '@/lib/crawl4ai';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -101,10 +101,9 @@ export const POST = route(async () => {
       ], { maxTokens: 1024, timeoutMs: 28_000 });
       return `${PROVIDERS[cfg.provider].label}, ${out.model}: "${out.content.trim().slice(0, 30)}"`;
     }),
-    run('reader', 'Company career sites', 'Page reader (Crawl4AI)', async () => {
+    run('reader', 'Company career sites', crawlerFrom(settings) ? 'Page reader (your Crawl4AI)' : 'Page reader (built-in)', async () => {
       const crawler = crawlerFrom(settings);
-      if (!crawler) throw new Skip('Not set up. Optional: add your Crawl4AI server in Settings, Job search.');
-      return testCrawler(crawler);
+      return crawler ? testCrawler(crawler) : testHostedReader();
     }),
     ...(() => {
       const cfg = searchConfig(settings);

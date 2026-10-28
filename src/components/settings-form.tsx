@@ -354,7 +354,7 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         <Button className="self-start" onClick={saveSearch}>Save</Button>
         <Status {...searchMsg} />
       </Section>
-      <Section title="Page reader (Crawl4AI)" id="reader" desc="Optional. Some job sites build the posting with JavaScript, so a plain read finds almost nothing. Point this at a Crawl4AI server on your own VPS and those pages open through it. Sites that block automated readers stay blocked.">
+      <Section title="Page reader" id="reader" desc="Some job sites build the posting with JavaScript, so a plain read finds almost nothing. Those pages already open through a built-in reader, with nothing to set up. Optional: add your own Crawl4AI server here to use it instead. Sites that block automated readers stay blocked.">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1">
             <Label htmlFor="c4url">Server address</Label>

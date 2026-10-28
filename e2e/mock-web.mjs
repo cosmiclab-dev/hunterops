@@ -50,6 +50,15 @@ http.createServer((req, res) => {
     // stand-in Crawl4AI server that returns the rendered page.
     if (p === '/page/spa') return send(res, 200, '<html><head><title>Loading</title></head><body><div id="root"></div><script src="/app.js"></script></body></html>');
     if (p === '/page/blocked') return send(res, 403, '<html><body>Access denied</body></html>');
+    // Hosted page reader (Jina Reader shape): /reader/<target url>.
+    if (p.startsWith('/reader/')) {
+      const target = decodeURIComponent(req.url.slice('/reader/'.length));
+      crawls.push(target);
+      if (/blocked/.test(target)) return send(res, 422, { code: 422, readableMessage: 'Target returned 403' });
+      if (!/\/page\/spa|example\.com/.test(target)) return send(res, 422, { code: 422, readableMessage: 'Failed to load the target page' });
+      if (/example\.com/.test(target)) return send(res, 200, { code: 200, data: { title: 'Example Domain', url: target, content: 'This domain is for use in examples.' } });
+      return send(res, 200, { code: 200, data: { title: 'Talent Partner, India', url: target, content: 'Spa Jobs is hiring a Talent Partner in Bengaluru to run end-to-end hiring for engineering and product teams.\n\n## What you will do\n\n- Own full-cycle recruiting for 15 to 20 open roles at a time\n- Build sourcing plans with Boolean search, LinkedIn Recruiter and referrals\n- Partner with hiring managers on scorecards, interview loops and offers\n\n## What you bring\n\n- 6+ years of recruiting, including tech hiring in India\n\nHybrid, Bengaluru. CTC 24-32 LPA.' } });
+    }
     if (p === '/crawl' && req.method === 'POST') {
       if (req.headers.authorization !== `Basic ${Buffer.from('hunter:c4-e2e').toString('base64')}`) return send(res, 401, { detail: 'Not authenticated' });
       const body = JSON.parse(raw || '{}');

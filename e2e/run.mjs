@@ -609,13 +609,18 @@ await step('every app page renders for a signed-in user', async () => {
   assert.match(old.headers.get('location'), /\/mailroom/);
 });
 
-await step('Crawl4AI page reader: JS-only pages read through it, blocked pages stay blocked', async () => {
+await step('Page readers: JS-only pages read through the built-in reader or Crawl4AI, blocked pages stay blocked', async () => {
   const WEB = 'http://127.0.0.1:4020';
-  // Off by default: a JavaScript-only page reads as almost empty.
+  // No Crawl4AI server: the built-in hosted reader renders the JavaScript-only page.
   const before = await call('POST', '/api/browser/open', { url: `${WEB}/page/spa` });
   assert.equal(before.status, 200, JSON.stringify(before.data));
-  assert.ok(!/Boolean search/.test(before.data.page.description));
-  assert.equal(before.data.page.via, 'direct');
+  assert.equal(before.data.page.via, 'reader');
+  assert.equal(before.data.page.title, 'Talent Partner, India');
+  assert.match(before.data.page.description, /Boolean search/);
+  const st0 = await call('POST', '/api/selftest');
+  const r0 = st0.data.checks.find((c) => c.id === 'reader');
+  assert.equal(r0.ok, true, r0.detail);
+  assert.match(r0.detail, /Built-in reader/);
   assert.equal((await call('PUT', '/api/settings', { values: { crawl4ai_url: WEB, crawl4ai_token: 'hunter:c4-e2e' } })).status, 200);
   const t = await call('POST', '/api/settings/test-reader', {});
   assert.equal(t.status, 200, JSON.stringify(t.data));
