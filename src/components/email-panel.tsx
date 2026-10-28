@@ -145,6 +145,42 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
   );
 }
 
+// Unverified address guesses from the person's name; a tap fills the To field.
+function GuessEmail({ name, company, jobId, onPick }: { name: string; company: string; jobId?: string; onPick: (email: string) => void }) {
+  const [res, setRes] = useState<{ guesses: string[]; note: string; mx: boolean } | null>(null);
+  const [domain, setDomain] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  async function guess() {
+    setBusy(true);
+    setErr('');
+    try {
+      setRes(await api('/api/email-guess', { method: 'POST', json: { name, company, jobId: jobId || undefined, domain: domain || undefined } }));
+    } catch (e) {
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flex flex-col gap-2 md:col-span-2" data-testid="email-guess">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={guess} disabled={busy || !name.trim()}>{busy ? 'Guessing…' : 'Guess their email'}</Button>
+        {res && <Input aria-label="Company email domain" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="company.com (optional)" className="h-9 w-48" />}
+      </div>
+      {res && (
+        <>
+          <p className="meta">{res.note} Unverified: check on LinkedIn or the company site before sending.</p>
+          <div className="flex flex-wrap gap-1.5">
+            {res.guesses.map((g) => <button key={g} type="button" className="chip" onClick={() => onPick(g)}>{g}</button>)}
+          </div>
+        </>
+      )}
+      {err && <p className="text-sm text-destructive" role="alert">{err}</p>}
+    </div>
+  );
+}
+
 // Compose and manage recruiter emails: for one job (job page) or any job or
 // company (Mailroom, where `jobs` lists the pipeline to pick from).
 export function EmailPanel({ jobId, initial, jobs }: { jobId?: string; initial: EmailRow[]; jobs?: JobOption[] }) {
@@ -210,6 +246,7 @@ export function EmailPanel({ jobId, initial, jobs }: { jobId?: string; initial: 
           <Label htmlFor="rtitle">Their title</Label>
           <Input id="rtitle" value={form.recipientTitle} onChange={(e) => set('recipientTitle')(e.target.value)} placeholder="Head of Talent" />
         </div>
+        <GuessEmail name={form.recipientName} company={form.company || jobs?.find((j) => j.id === form.jobId)?.company || ''} jobId={form.jobId || undefined} onPick={set('toEmail')} />
         <div className="flex flex-col gap-1">
           <Label htmlFor="kind">Type</Label>
           <Select id="kind" value={form.kind} onChange={set('kind')} options={KINDS} />

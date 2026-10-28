@@ -6,7 +6,7 @@ import { saveInternal, type Settings } from '../settings';
 import { clip, csv } from '../utils';
 import { classifyLocation, detectWorkMode, LOCATION_CLASSES, type LocationClass } from '../location';
 import { ATS_FETCHERS, BOARD_FETCHERS, type Posting, type ScanCtx } from './sources';
-import { RETIRED_COMPANIES, SEED_COMPANIES } from './seed-companies';
+import { RETIRED_COMPANIES, SEED_COMPANIES, SEED_VERSION } from './seed-companies';
 import { grill } from '../modules/grill';
 import { loadProfile, profileIsEmpty, toGrillProfile } from '../profile';
 
@@ -129,7 +129,15 @@ export async function seedCompanies() {
     where: { OR: RETIRED_COMPANIES.map(([atsType, atsSlug]) => ({ atsType, atsSlug })) },
     data: { active: false },
   });
+  await saveInternal('seed_version', String(SEED_VERSION));
   return res.count;
+}
+
+// Adds boards from a newer starter list; boards the person removed stay removed
+// only if they deleted them after this version (paused ones stay paused).
+export async function syncSeedCompanies(settings: Settings) {
+  if (Number(settings.get('seed_version') || 0) >= SEED_VERSION) return 0;
+  return seedCompanies();
 }
 
 type TaskResult = { name: string; fetched: number; kept: Kept[]; note?: string };
@@ -147,7 +155,7 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
   const prefs = scanPrefs(settings);
   const run = await prisma.scanRun.create({ data: { trigger } });
 
-  if (!companyIds) await seedCompanies();
+  if (!companyIds) await syncSeedCompanies(settings);
   const companies = companyIds
     ? await prisma.company.findMany({ where: { id: { in: companyIds } } })
     : await prisma.company.findMany({ where: { active: true }, orderBy: { lastScannedAt: { sort: 'asc', nulls: 'first' } }, take: companyLimit });
@@ -171,9 +179,11 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
       });
       return { name: c.name, fetched: postings.length, kept };
     } catch (err) {
+      // A board that no longer exists is paused so it stops costing scan time.
+      const gone = (err as { status?: number }).status === 404;
       await prisma.company.update({
         where: { id: c.id },
-        data: { lastScannedAt: new Date(), lastStatus: 'error', lastError: clip((err as Error).message, 500) },
+        data: { lastScannedAt: new Date(), lastStatus: 'error', lastError: clip(gone ? `${(err as Error).message}. Paused automatically; resume it after fixing the link.` : (err as Error).message, 500), ...(gone ? { active: false } : {}) },
       });
       throw new Error(`${c.name}: ${(err as Error).message}`);
     }
