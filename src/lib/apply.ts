@@ -16,12 +16,12 @@ import { extraBanned } from './writer';
 import { clip } from './utils';
 import { findOriginalPosting, isAggregatorUrl } from './original-posting';
 import { evaluateJob } from './career-ops/evaluate-job';
-import { startTask, type Tracker } from './tasks';
+import { STALE_TASK_MS, startTask, type Tracker } from './tasks';
 
 export type { Answer };
 
 // A preparation that has not finished in this long died with its function.
-const STALE_PREP_MS = 6 * 60_000;
+const STALE_PREP_MS = STALE_TASK_MS;
 
 export const isStalePrep = (a: { status: string; updatedAt: Date }) => a.status === 'PREPARING' && Date.now() - a.updatedAt.getTime() > STALE_PREP_MS;
 

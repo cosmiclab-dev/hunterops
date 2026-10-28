@@ -167,7 +167,7 @@ jobs:
           REAL_AI_BASE: ${{ steps.model.outputs.base }}
           REAL_AI_MODEL: ${{ steps.model.outputs.name }}
           REAL_AI_KEY: ${{ steps.model.outputs.auth == 'gh' && secrets.GITHUB_TOKEN || 'no-key-needed' }}
-          LLM_MAX_OUTPUT_TOKENS: '4000'
+          LLM_MAX_OUTPUT_TOKENS: '8000'
           # The keyless service allows one reply every 30 s, so calls are
           # spaced out and Apply is given longer than on Vercel.
           LLM_MIN_GAP_MS: ${{ steps.model.outputs.auth == 'gh' && '0' || '32000' }}

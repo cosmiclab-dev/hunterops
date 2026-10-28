@@ -3,6 +3,7 @@
 // leaves the page or closes the app. Finishing or failing leaves a
 // notification and, where the phone allowed it, a push notification.
 import type { Prisma, Task } from '@prisma/client';
+import { REQUEST_BUDGET_MS } from './budget';
 import { prisma } from './db';
 import { notify } from './notify';
 import { clip } from './utils';
@@ -11,8 +12,8 @@ export type StepState = 'pending' | 'running' | 'done' | 'failed' | 'skipped';
 export type Step = { key: string; label: string; state: StepState; detail?: string };
 export type TaskKind = 'apply' | 'scan' | 'evaluate' | 'resume' | 'import' | 'auto';
 
-// A task that has not moved in this long died with its function.
-export const STALE_TASK_MS = 6 * 60_000;
+// Longer than any run may last (the request budget), so only a dead one counts.
+export const STALE_TASK_MS = Math.max(6 * 60_000, REQUEST_BUDGET_MS + 60_000);
 
 export const isStaleTask = (t: { status: string; updatedAt: Date }) => t.status === 'RUNNING' && Date.now() - t.updatedAt.getTime() > STALE_TASK_MS;
 
