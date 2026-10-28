@@ -140,17 +140,22 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for m in deepseek/DeepSeek-V3-0324 openai/gpt-4.1-mini openai/gpt-4o-mini; do
-            code=$(curl -s -o /tmp/probe.json -w '%{http_code}' https://models.github.ai/inference/chat/completions \
-              -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
-              -d "{\"model\":\"$m\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the word ok\"}],\"max_tokens\":5}")
-            echo "$m -> HTTP $code: $(head -c 300 /tmp/probe.json)"
-            if [ "$code" = 200 ]; then echo "name=$m" >> "$GITHUB_OUTPUT"; break; fi
+          # Sent the way the app sends it; a real answer has "choices".
+          for base in https://models.github.ai/inference https://models.inference.ai.azure.com; do
+            for m in deepseek/DeepSeek-V3-0324 DeepSeek-V3-0324 openai/gpt-4.1-mini gpt-4.1-mini openai/gpt-4o-mini gpt-4o-mini; do
+              code=$(curl -s -o /tmp/probe.json -w '%{http_code}' "$base/chat/completions" \
+                -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' -H 'User-Agent: hunterops/2.0' \
+                -d "{\"model\":\"$m\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the word ok\"}],\"max_tokens\":5,\"stream\":false}")
+              echo "$base $m -> HTTP $code: $(head -c 200 /tmp/probe.json)"
+              if [ "$code" = 200 ] && grep -q '"choices"' /tmp/probe.json; then
+                echo "name=$m" >> "$GITHUB_OUTPUT"; echo "base=$base" >> "$GITHUB_OUTPUT"; exit 0
+              fi
+            done
           done
       - name: Live journey with the real AI
         if: steps.model.outputs.name != ''
         env:
-          REAL_AI_BASE: https://models.github.ai/inference
+          REAL_AI_BASE: ${{ steps.model.outputs.base }}
           REAL_AI_MODEL: ${{ steps.model.outputs.name }}
           REAL_AI_KEY: ${{ secrets.GITHUB_TOKEN }}
           LLM_MAX_OUTPUT_TOKENS: '4000'
