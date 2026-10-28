@@ -35,6 +35,7 @@ export const SETTINGS: Record<string, Def> = {
   search_provider: { label: 'Web search', fallback: 'free' },
   search_api_key: { label: 'Web search API key', secret: true, env: 'SEARCH_API_KEY' },
   boards_scanned_at: { label: 'Boards last scanned', internal: true },
+  seed_version: { label: 'Starter boards version', internal: true },
 };
 
 export type SettingKey = keyof typeof SETTINGS;

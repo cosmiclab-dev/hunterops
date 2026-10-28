@@ -576,6 +576,14 @@ await step('Story bank: evaluation stories listed; add, check and delete by hand
   assert.equal((await call('POST', '/api/stories', { title: 'x' })).status, 400);
 });
 
+await step('Email guesses: patterns for a named recruiter, marked unverified, nothing sent', async () => {
+  const r = await call('POST', '/api/email-guess', { name: 'Meera Iyer', jobId: ghJob.id, domain: 'acmecloud.example' });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.guesses[0], 'meera.iyer@acmecloud.example');
+  assert.equal(r.data.mx, false);
+  assert.equal((await call('POST', '/api/email-guess', { name: '' })).status, 400);
+});
+
 await step('Pipeline columns: Scouted, Grilled 75+, Applied, Rejected', async () => {
   const res = await call('GET', '/pipeline', undefined, { raw: true });
   assert.equal(res.status, 200);
