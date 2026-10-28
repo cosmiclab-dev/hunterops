@@ -101,3 +101,63 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@v4
         with: { name: live-screens, path: /tmp/hunterops-shots, if-no-files-found: ignore }
+
+  # The live journey again, with a real AI (GitHub Models, free with the
+  # workflow's token) instead of the stand-in: the answers, the resume, the
+  # cover letter and a scored evaluation must all come back.
+  e2e-real-ai:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: pg, POSTGRES_DB: hunterops }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Browser
+        run: |
+          npm i --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium || npx playwright install chromium
+      - name: Test environment
+        run: |
+          cat > .env.e2e <<'ENV'
+          DATABASE_URL=postgresql://postgres:pg@localhost:5432/hunterops
+          DIRECT_URL=postgresql://postgres:pg@localhost:5432/hunterops
+          APP_SECRET=ci-only-secret-0123456789abcdef0123456789
+          APP_PASSWORD=letmein
+          CRON_SECRET=cronsecret
+          ENV
+      - name: Pick a free model that answers
+        id: model
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for m in deepseek/DeepSeek-V3-0324 openai/gpt-4.1-mini openai/gpt-4o-mini; do
+            code=$(curl -s -o /tmp/probe.json -w '%{http_code}' https://models.github.ai/inference/chat/completions \
+              -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
+              -d "{\"model\":\"$m\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with the word ok\"}],\"max_tokens\":5}")
+            echo "$m -> HTTP $code: $(head -c 300 /tmp/probe.json)"
+            if [ "$code" = 200 ]; then echo "name=$m" >> "$GITHUB_OUTPUT"; break; fi
+          done
+      - name: Live journey with the real AI
+        if: steps.model.outputs.name != ''
+        env:
+          REAL_AI_BASE: https://models.github.ai/inference
+          REAL_AI_MODEL: ${{ steps.model.outputs.name }}
+          REAL_AI_KEY: ${{ secrets.GITHUB_TOKEN }}
+          LLM_MAX_OUTPUT_TOKENS: '4000'
+        run: bash e2e/e2e-live.sh
+      - name: No free model answered
+        if: steps.model.outputs.name == ''
+        run: echo "::error::No GitHub Models model answered, so the real-AI journey could not run" && exit 1
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: real-ai-screens, path: /tmp/hunterops-shots, if-no-files-found: ignore }

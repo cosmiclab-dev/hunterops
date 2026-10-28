@@ -1,6 +1,7 @@
 import { HttpError, ok, route } from '@/lib/http';
 import { safeEqual } from '@/lib/crypto';
 import { autoPrepare } from '@/lib/apply';
+import { recordAiHealth } from '@/lib/health';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -11,5 +12,6 @@ export const GET = route(async (req: Request) => {
   const secret = process.env.CRON_SECRET;
   const auth = req.headers.get('authorization') || '';
   if (!secret || !safeEqual(auth, `Bearer ${secret}`)) throw new HttpError(401, 'Unauthorized');
-  return ok(await autoPrepare());
+  const health = await recordAiHealth();
+  return ok({ health, ...(await autoPrepare()) });
 });

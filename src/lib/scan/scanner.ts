@@ -2,6 +2,7 @@
 // keeps recruiter-type roles in Bengaluru / remote, stores new ones and grills them.
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../db';
+import { startTask, type Tracker } from '../tasks';
 import { saveInternal, type Settings } from '../settings';
 import { clip, csv } from '../utils';
 import { classifyLocation, detectWorkMode, LOCATION_CLASSES, type LocationClass } from '../location';
@@ -182,8 +183,8 @@ type TaskResult = { name: string; fetched: number; kept: Kept[]; note?: string }
  * force: scan boards even if they ran in the last 2 hours.
  * companyIds: scan only these companies (and no boards).
  */
-export async function runScan(settings: Settings, opts: { trigger?: string; budgetMs?: number; force?: boolean; companyIds?: string[] | null; companyLimit?: number } = {}) {
-  const { trigger = 'manual', budgetMs = 45_000, force = false, companyIds = null, companyLimit = 200 } = opts;
+export async function runScan(settings: Settings, opts: { trigger?: string; budgetMs?: number; force?: boolean; companyIds?: string[] | null; companyLimit?: number; progress?: Tracker } = {}) {
+  const { trigger = 'manual', budgetMs = 45_000, force = false, companyIds = null, companyLimit = 200, progress } = opts;
   const started = Date.now();
   const deadline = started + budgetMs;
   const prefs = scanPrefs(settings);
@@ -233,6 +234,7 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
     }
   }));
 
+  await progress?.step('fetch', 'running', `${tasks.length} sources`);
   const results = await pool(tasks, deadline);
   // Only count the boards as checked if at least one of them actually ran.
   if (scanBoards && results.slice(0, boardNames.length).some((r) => !('skipped' in r))) await saveInternal('boards_scanned_at', new Date().toISOString());
@@ -251,6 +253,8 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
       if (r.note) errors.push({ source: label, error: r.note });
     }
   });
+  await progress?.step('fetch', 'done', `${fetched.toLocaleString('en-IN')} postings from ${tasks.length - skipped} sources, ${rows.length} match your roles`);
+  await progress?.step('save', 'running');
   await addMissingDescriptions(rows, deadline + 20_000);
   const inserted = rows.length ? await insertPostings(rows) : 0;
   const backfilled = await backfillDescriptions(deadline + 30_000);
@@ -268,9 +272,34 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
     boards: scanBoards,
     ms: Date.now() - started,
   };
+  await progress?.step('save', 'done', inserted ? `${inserted} new job${inserted === 1 ? '' : 's'} saved and scored` : 'No new jobs: every match is already on your board');
   await prisma.scanRun.update({
     where: { id: run.id },
     data: { finishedAt: new Date(), sources: tasks.length - skipped, fetched, matched: rows.length, inserted, errors: summary.errors },
   });
   return summary;
+}
+
+export const SCAN_STEPS = [
+  { key: 'fetch', label: 'Reading company boards and job sites' },
+  { key: 'save', label: 'Saving and scoring new matches' },
+];
+
+// A scan the person (or the morning run) started: its progress shows on every
+// screen, and new matches leave a notification.
+export async function scanWithProgress(settings: Settings, opts: Parameters<typeof runScan>[1] = {}) {
+  const task = await startTask({ kind: 'scan', title: 'Scan', href: '/jobs?view=new&sort=newest', steps: SCAN_STEPS });
+  try {
+    const summary = await runScan(settings, { ...opts, progress: task });
+    const n = summary.inserted;
+    await task.done({
+      result: summary,
+      title: n ? `Scan found ${n} new job${n === 1 ? '' : 's'}` : `Scan: no new jobs (${summary.matched} matches already on your board)`,
+      note: n ? { kind: 'matches', title: `${n} new job${n === 1 ? '' : 's'} for you`, body: `From ${summary.fetched.toLocaleString('en-IN')} postings checked. Tap to see them, best fit first.`, href: '/jobs?view=new&sort=newest' } : null,
+    });
+    return summary;
+  } catch (err) {
+    await task.fail(err, { title: 'Scan failed', href: '/' });
+    throw err;
+  }
 }

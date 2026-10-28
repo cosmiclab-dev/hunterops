@@ -17,7 +17,7 @@ export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: stri
 // `session` groups the calls of one task (a draft and its anti-slop rewrite) so
 // gateways such as OpenCode Go can route them together and reuse the prompt cache.
 export type ChatOptions = { maxTokens?: number; temperature?: number; json?: boolean; timeoutMs?: number; session?: string };
-export type ChatResult = { content: string; model: string; usage: unknown };
+export type ChatResult = { content: string; model: string; usage: unknown; cut?: boolean };
 
 export type Overrides = { provider?: string; model?: string; key?: string; baseUrl?: string };
 
@@ -76,11 +76,13 @@ export function gatewayHeaders(cfg: LlmConfig, session?: string): Record<string,
 // Thinking models (DeepSeek V4, Kimi, GLM...) spend output tokens on reasoning
 // before the answer, so a small cap returns an empty reply. Only used tokens are billed.
 export const MIN_OUTPUT_TOKENS = 4096;
-const MAX_OUTPUT_TOKENS = 16_000;
+export const MAX_OUTPUT_TOKENS = 16_000;
 
 function buildRequest(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions): { headers: Record<string, string>; body: unknown } {
   const extra = gatewayHeaders(cfg, opts.session);
-  const maxTokens = Math.min(MAX_OUTPUT_TOKENS, Math.max(opts.maxTokens ?? 2000, MIN_OUTPUT_TOKENS));
+  // LLM_MAX_OUTPUT_TOKENS caps it for providers with a small output limit (the CI test's free models).
+  const cap = Number(process.env.LLM_MAX_OUTPUT_TOKENS) || MAX_OUTPUT_TOKENS;
+  const maxTokens = Math.min(cap, MAX_OUTPUT_TOKENS, Math.max(opts.maxTokens ?? 2000, MIN_OUTPUT_TOKENS));
   if (cfg.format === 'anthropic') {
     const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n\n');
     const rest = messages.filter((m) => m.role !== 'system');
@@ -175,11 +177,18 @@ export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOp
       ? `"${cfg.model}" used its whole answer budget thinking. Try again, or pick a faster model in Settings.`
       : 'The model returned an empty answer. Try again.');
   }
-  return { content, model: data?.model || cfg.model, usage: data?.usage ?? null };
+  const cut = data?.choices?.[0]?.finish_reason === 'length' || data?.stop_reason === 'max_tokens';
+  return { content, model: data?.model || cfg.model, usage: data?.usage ?? null, cut };
 }
 
 // Models sometimes wrap JSON in fences or add a sentence around it.
 export function extractJson(text: string): any {
+  const found = parseJsonLoose(text);
+  if (found === undefined) throw new HttpError(502, 'The model did not return valid JSON. Try again.');
+  return found;
+}
+
+function parseJsonLoose(text: string): any {
   const cleaned = text.replace(/```(?:json)?/gi, '').trim();
   try {
     return JSON.parse(cleaned);
@@ -191,10 +200,71 @@ export function extractJson(text: string): any {
       return JSON.parse(cleaned.slice(start, end + 1));
     } catch { /* fall through */ }
   }
-  throw new HttpError(502, 'The model did not return valid JSON. Try again.');
+  return undefined;
 }
 
+// Closes an answer that was cut off mid-way: the open string, then every open
+// array and object, dropping a half-written key or value at the end.
+export function closeTruncatedJson(text: string): any {
+  const cleaned = text.replace(/```(?:json)?/gi, '');
+  const start = cleaned.indexOf('{');
+  if (start === -1) return undefined;
+  const src = cleaned.slice(start);
+  const stack: string[] = [];
+  let inStr = false;
+  let esc = false;
+  // Positions where the JSON so far ends cleanly after a complete value.
+  let safe = -1;
+  let safeStack: string[] = [];
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') inStr = true;
+    else if (c === '{' || c === '[') stack.push(c === '{' ? '}' : ']');
+    else if (c === '}' || c === ']') {
+      stack.pop();
+      if (!stack.length) return parseJsonLoose(src.slice(0, i + 1));
+    }
+    if (!inStr && (c === ',' || c === '{' || c === '[')) {
+      safe = c === ',' ? i : i + 1;
+      safeStack = [...stack];
+    }
+  }
+  if (safe === -1) return undefined;
+  const body = src.slice(0, safe).replace(/,\s*$/, '');
+  try {
+    return JSON.parse(body + safeStack.reverse().join(''));
+  } catch {
+    return undefined;
+  }
+}
+
+const JSON_AGAIN = 'Your last answer was not a complete, valid JSON object. Reply again with only the complete JSON object in the requested shape: no text before or after it, and keep every string short enough that the whole object fits.';
+
+// One JSON answer. An answer that was cut off gets one more try with more
+// room; one that is not JSON gets one more try with a reminder. Only then
+// does a half answer count, closed where it stopped.
 export async function chatJson(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions = {}) {
   const out = await chat(cfg, messages, { ...opts, json: true });
-  return { ...out, data: extractJson(out.content) };
+  const data = parseJsonLoose(out.content);
+  if (data !== undefined && typeof data === 'object' && data) return { ...out, data };
+  console.warn('[llm] invalid JSON', { model: out.model, cut: out.cut, chars: out.content.length, tail: out.content.slice(-200) });
+  if (timeLeft() > 45_000) {
+    const budget = Math.max(opts.maxTokens ?? 2000, MIN_OUTPUT_TOKENS);
+    const again = out.cut && budget < MAX_OUTPUT_TOKENS
+      ? await chat(cfg, messages, { ...opts, json: true, maxTokens: MAX_OUTPUT_TOKENS }).catch(() => null)
+      : await chat(cfg, [...messages, { role: 'user', content: JSON_AGAIN }], { ...opts, json: true }).catch(() => null);
+    const second = again && parseJsonLoose(again.content);
+    if (again && second && typeof second === 'object') return { ...again, data: second };
+    const closed = again && closeTruncatedJson(again.content);
+    if (again && closed) return { ...again, data: closed };
+  }
+  const closed = closeTruncatedJson(out.content);
+  if (closed) return { ...out, data: closed };
+  throw new HttpError(502, 'The AI\'s answer was not readable, twice. Try again, or pick another model in Settings.');
 }

@@ -1,6 +1,6 @@
 import { ok, readJson, route } from '@/lib/http';
 import { loadSettings } from '@/lib/settings';
-import { runScan } from '@/lib/scan/scanner';
+import { scanWithProgress } from '@/lib/scan/scanner';
 
 export const dynamic = 'force-dynamic';
 // 45 s of fetching, then saving and scoring.
@@ -9,7 +9,7 @@ export const maxDuration = 120;
 export const POST = route(async (req: Request) => {
   const body = await readJson<{ force?: boolean; companyIds?: string[] }>(req);
   const settings = await loadSettings();
-  const summary = await runScan(settings, {
+  const summary = await scanWithProgress(settings, {
     trigger: 'manual',
     budgetMs: 45_000,
     force: Boolean(body.force),

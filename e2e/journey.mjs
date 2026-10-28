@@ -141,7 +141,10 @@ await step('Apply with AI on a Greenhouse job: the real form questions, resume, 
   await page.waitForURL(/\/apply\//);
   const prepared = answered('/api/applications', 'POST');
   await page.getByTestId('prepare-application').click();
-  assert.equal((await prepared).status(), 201);
+  assert.equal((await prepared).status(), 202);
+  // The steps show on the page while it works.
+  await page.getByTestId('apply-progress').getByTestId('task-steps').waitFor();
+  await shot('apply-progress');
   await page.locator('[data-testid=apply-view][data-status=PENDING]').waitFor({ timeout: 120_000 });
   const labels = await page.getByTestId('apply-answer').allInnerTexts();
   const values = await page.getByTestId('apply-answer').locator('input, textarea').evaluateAll((els) => els.map((e) => e.value));
@@ -189,8 +192,50 @@ await step('Apply with AI on an Adzuna job finds the employer’s own posting an
   await page.getByText(/Found the employer's own posting/).waitFor();
   const labels = await page.getByTestId('apply-answer').allInnerTexts();
   assert.ok(labels.some((l) => /Why do you want to join Acme Cloud\?/.test(l)), labels.join(' | '));
+  // The employer's full posting replaced the job board's snippet, so the resume and evaluation were made.
+  await page.getByTestId('apply-resume').waitFor();
+  await page.getByTestId('apply-evaluation').waitFor();
   assert.ok(!labels.some((l) => /country-selector/.test(l)));
   await shot('apply-adzuna');
+});
+
+await step('start Apply, press back: the progress stays on every screen, then a pop-up and the bell say it is ready', async () => {
+  await tab('Jobs').click();
+  await page.getByTestId('job-card').filter({ hasText: 'Talent Acquisition Partner, GTM' }).getByTestId('card-apply').click();
+  await page.waitForURL(/\/apply\//);
+  const started = answered('/api/applications', 'POST');
+  await page.getByTestId('prepare-application').click();
+  assert.equal((await started).status(), 202);
+  await page.goBack();
+  await page.waitForURL(/\/jobs/);
+  const bar = page.getByTestId('activity-bar');
+  await bar.waitFor();
+  await bar.getByText('Preparing application').waitFor();
+  await shot('progress-bar-after-back');
+  // It follows to other tabs.
+  await tab('Pipeline').click();
+  await bar.waitFor();
+  // Done: the bar goes, a pop-up links to it, the bell counts it.
+  await bar.waitFor({ state: 'detached', timeout: 120_000 });
+  await page.getByTestId('toast').filter({ hasText: /Ready for your approval: Figma: Talent Acquisition Partner, GTM/ }).waitFor();
+  await shot('toast-ready');
+  const count = Number(await page.locator('[data-testid=bell-count]:visible').innerText());
+  assert.ok(count >= 2, `bell count ${count}`);
+  await page.locator('[data-testid=bell]:visible').click();
+  await page.waitForURL(/\/notifications/);
+  const note = page.getByTestId('notification').filter({ hasText: 'Talent Acquisition Partner, GTM' }).first();
+  await note.waitFor();
+  await page.getByTestId('push-card').waitFor();
+  await shot('notifications');
+  // Seen: the bell clears.
+  await page.locator('[data-testid=bell-count]:visible').waitFor({ state: 'detached' });
+  // Everything was made: no "Not made" in the notification.
+  assert.doesNotMatch(await note.innerText(), /Not made/);
+  await note.click();
+  await page.waitForURL(/\/apply\//);
+  await page.locator('[data-testid=apply-view][data-status=PENDING]').waitFor();
+  await page.getByTestId('apply-resume').waitFor();
+  await page.getByTestId('apply-evaluation').waitFor();
 });
 
 await step('Prepare my top matches on the Apply tab prepares the rest for approval', async () => {
@@ -198,14 +243,16 @@ await step('Prepare my top matches on the Apply tab prepares the rest for approv
   const done = answered('/api/applications/auto', 'POST');
   await page.getByTestId('prepare-top').first().click();
   const out = await (await done).json();
-  assert.ok(out.prepared.length >= 1, JSON.stringify(out));
-  await page.getByText(/ready for your approval/).waitFor();
+  assert.ok(out.started.length >= 1, JSON.stringify(out));
+  await page.getByText(/Preparing \d+ application/).waitFor();
+  await page.getByTestId('activity-bar').waitFor();
+  await page.getByTestId('activity-bar').waitFor({ state: 'detached', timeout: 150_000 });
   await page.getByTestId('apply-row').filter({ hasText: 'Approval pending' }).first().waitFor();
   await shot('apply-hub-after');
 });
 
 await step('no screen scrolls sideways and no script errors along the way', async () => {
-  for (const path of ['/', '/jobs', '/apply', '/pipeline', '/more', '/profile', '/settings']) {
+  for (const path of ['/', '/jobs', '/apply', '/pipeline', '/more', '/profile', '/settings', '/notifications']) {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
     const w = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);

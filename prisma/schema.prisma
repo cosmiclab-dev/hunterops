@@ -309,3 +309,52 @@ model Setting {
 
   @@map("app_settings")
 }
+
+// Long jobs the person starts (an application, a scan, an evaluation, a CV
+// import) and the morning run. Each keeps its steps so the app can show the
+// progress on every screen, after leaving the page or closing the app.
+model Task {
+  id         String    @id @default(uuid()) @db.Uuid
+  kind       String
+  title      String
+  jobId      String?   @map("job_id") @db.Uuid
+  status     String    @default("RUNNING")
+  // [{ key, label, state: pending|running|done|failed|skipped, detail }]
+  steps      Json      @default("[]")
+  href       String?
+  result     Json?
+  error      String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  finishedAt DateTime? @map("finished_at")
+
+  @@index([status, updatedAt])
+  @@map("tasks")
+}
+
+// What the bell shows: an application ready for approval, something that
+// failed, new matches from a scan.
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  kind      String
+  title     String
+  body      String    @default("")
+  href      String?
+  taskId    String?   @map("task_id") @db.Uuid
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([readAt, createdAt])
+  @@map("notifications")
+}
+
+// Phones and browsers that asked for notifications (Web Push).
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("push_subscriptions")
+}

@@ -33,6 +33,25 @@ export function titleOverlap(a: string, b: string) {
 
 const companyKey = (s: string) => s.toLowerCase().replace(/\b(pvt|private|ltd|limited|llp|inc|india|technologies|technology|solutions|services|global|group|corp|corporation)\b/g, '').replace(/[^a-z0-9]/g, '');
 
+// "Acme Cloud Pvt Ltd" and "acmecloud" are the same employer; "ULOOK" and "Marketech" are not.
+export function sameCompany(a: string, b: string) {
+  const x = companyKey(a);
+  const y = companyKey(b);
+  if (x.length < 3 || y.length < 3) return false;
+  return x === y || (x.length >= 4 && y.includes(x)) || (y.length >= 4 && x.includes(y));
+}
+
+// The employer's slug in an ATS address: boards.greenhouse.io/acme/..., acme.wd3.myworkdayjobs.com.
+function urlCompany(url: string) {
+  try {
+    const u = new URL(url);
+    if (/myworkdayjobs\.com$/.test(u.hostname)) return u.hostname.split('.')[0];
+    return u.pathname.split('/').filter(Boolean)[0] || '';
+  } catch {
+    return '';
+  }
+}
+
 export type Original = { url: string; via: 'board' | 'search' };
 
 export async function findOriginalPosting(job: { title: string; company: string }, settings: Settings): Promise<Original | null> {
@@ -56,7 +75,12 @@ export async function findOriginalPosting(job: { title: string; company: string 
   const q = `"${job.title}" "${job.company}" (${sites.map((s) => `site:${s}`).join(' OR ')})`;
   try {
     const results = await webSearch(searchConfig(settings), q, 'w', 10);
-    const hit = results.find((r) => atsRef(r.url) && titleOverlap(job.title, splitResultTitle(r.title, r.url).role) >= 0.6);
+    // Same role AND same employer: a similar title at another company is a different job.
+    const hit = results.find((r) => {
+      if (!atsRef(r.url)) return false;
+      const { role, company } = splitResultTitle(r.title, r.url);
+      return titleOverlap(job.title, role) >= 0.6 && (sameCompany(job.company, company) || sameCompany(job.company, urlCompany(r.url)));
+    });
     return hit ? { url: hit.url, via: 'search' } : null;
   } catch {
     return null;

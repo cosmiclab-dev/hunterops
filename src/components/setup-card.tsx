@@ -7,6 +7,17 @@ import { Check, FileUp, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScanButton } from '@/components/scan-button';
 import { cn } from '@/lib/utils';
+import { toast } from '@/lib/toast';
+
+// "Filled from your CV: name, contact details, 5 roles… Still needed: expected CTC."
+export function fillMessage(d: { filled?: string[]; missing?: string[]; grilled?: number; warning?: string | null }) {
+  return [
+    d.filled?.length ? `Filled from your CV: ${d.filled.join(', ')}.` : 'Profile filled from your CV.',
+    d.grilled ? `${d.grilled} jobs scored against it.` : '',
+    d.missing?.length ? `Still needed (a CV doesn't say): ${d.missing.join(', ')}. Add it in Profile.` : '',
+    d.warning || '',
+  ].filter(Boolean).join(' ');
+}
 
 type Step = { id: string; title: string; sub: string; done: boolean; optional?: boolean };
 
@@ -31,7 +42,8 @@ export function SetupCard({ steps }: { steps: Step[] }) {
       const res = await fetch('/api/profile/import', { method: 'POST', body: form });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Upload failed (HTTP ${res.status})`);
-      setMsg(`Profile filled from your CV${data.grilled ? ` and ${data.grilled} jobs scored` : ''}.${data.warning ? ` ${data.warning}` : ''}`);
+      setMsg(fillMessage(data));
+      toast('Profile filled from your CV.', { href: '/profile', action: 'Check it' });
       router.refresh();
     } catch (e) {
       setErr((e as Error).message);

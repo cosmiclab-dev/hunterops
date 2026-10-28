@@ -13,6 +13,11 @@ const { chromium, devices } = createRequire(import.meta.url)('playwright');
 const BASE = process.env.BASE || 'http://localhost:3100';
 const SHOTS = process.env.SHOTS || '/tmp/hunterops-shots';
 fs.mkdirSync(SHOTS, { recursive: true });
+// A real AI when the workflow provides one (GitHub Models), else the local stand-in.
+const REAL_AI = Boolean(process.env.REAL_AI_KEY);
+const AI = REAL_AI
+  ? { base: process.env.REAL_AI_BASE, model: process.env.REAL_AI_MODEL, key: process.env.REAL_AI_KEY }
+  : { base: 'http://127.0.0.1:4010/v1', model: 'deepseek-v4.1-flash', key: 'e2e-key' };
 const sql = (q) => execFileSync('psql', [process.env.DATABASE_URL, '-tAc', q]).toString().trim();
 
 const browser = await chromium.launch();
@@ -32,7 +37,7 @@ async function step(name, fn) {
 const tab = (label) => page.getByRole('navigation', { name: 'Tabs' }).getByRole('link', { name: label, exact: true });
 const answered = (part, method) => page.waitForResponse((r) => r.url().includes(part) && r.request().method() === method, { timeout: 180_000 });
 
-console.log(`Live user journey against the real job sites, app at ${BASE}`);
+console.log(`Live user journey against the real job sites, app at ${BASE}, AI: ${REAL_AI ? `${AI.model} (real)` : 'local stand-in'}`);
 
 await step('sign in, connect the AI, upload the CV, add pay and notice', async () => {
   await page.goto('/login');
@@ -41,9 +46,9 @@ await step('sign in, connect the AI, upload the CV, add pay and notice', async (
   await page.waitForURL(`${BASE}/`);
   await page.goto('/settings');
   await page.selectOption('#provider', 'custom');
-  await page.fill('#base', 'http://127.0.0.1:4010/v1');
-  await page.fill('#model', 'deepseek-v4.1-flash');
-  await page.fill('#key', 'e2e-key');
+  await page.fill('#base', AI.base);
+  await page.fill('#model', AI.model);
+  await page.fill('#key', AI.key);
   const saved = answered('/api/settings', 'PUT');
   await page.locator('section', { has: page.locator('#provider') }).getByRole('button', { name: 'Save', exact: true }).click();
   assert.equal((await saved).status(), 200);
@@ -97,13 +102,24 @@ await step('Apply with AI on a real Greenhouse, Lever or Ashby job reads its rea
   const prepared = answered('/api/applications', 'POST');
   await page.getByTestId('prepare-application').click();
   const res = await prepared;
-  assert.equal(res.status(), 201, await res.text());
-  await page.locator('[data-testid=apply-view][data-status=PENDING]').waitFor({ timeout: 180_000 });
+  assert.equal(res.status(), 202, await res.text());
+  await page.locator('[data-testid=apply-view]:not([data-status=PREPARING])').waitFor({ timeout: 280_000 });
+  const status = await page.getByTestId('apply-view').getAttribute('data-status');
+  const app = JSON.parse(sql(`SELECT row_to_json(a) FROM (SELECT status, error, notes, resume_id, length(cover_letter) AS letter FROM applications WHERE job_id = '${id}') a`));
+  assert.equal(status, 'PENDING', JSON.stringify(app));
   const labels = await page.getByTestId('apply-answer').allInnerTexts();
   assert.ok(labels.length >= 3, labels.join(' | '));
   assert.ok(labels.some((l) => /e-?mail/i.test(l)), `no email question: ${labels.join(' | ')}`);
   await shot('apply');
-  return `${title} at ${company}: ${labels.length} questions`;
+  // With a real AI, every part must be there: nothing quietly missing.
+  if (REAL_AI) {
+    assert.ok(app.resume_id, `no tailored resume: ${JSON.stringify(app.notes)}`);
+    assert.ok(app.letter > 200, `no cover letter: ${JSON.stringify(app.notes)}`);
+    const score = sql(`SELECT score FROM reports WHERE job_id = '${id}' ORDER BY created_at DESC LIMIT 1`);
+    assert.ok(Number(score) >= 1, `evaluation without a score (${score}): ${JSON.stringify(app.notes)}`);
+    await page.getByTestId('apply-evaluation').waitFor();
+  }
+  return `${title} at ${company}: ${labels.length} questions${REAL_AI ? ', resume, cover letter and a scored evaluation' : ''}`;
 });
 
 await step('Discover finds live postings with the free web search', async () => {

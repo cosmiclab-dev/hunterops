@@ -169,3 +169,35 @@ export function profileToText(p: Partial<ProfileInput>) {
   if (p.dealbreakers?.length) lines.push(`Dealbreakers (treat as red flags): ${p.dealbreakers.join('; ')}`);
   return lines.join('\n');
 }
+
+const CURRENT = /^(present|current|now|ongoing|till date|to date|today)$/i;
+
+// A CV says whether someone is working now: no role still running means they
+// can join at once. Notice period is the one fact a CV gives only this way.
+export function inferNoticePeriod(experience: Experience[]) {
+  const roles = experience.filter((e) => e.title || e.company);
+  if (!roles.length) return '';
+  const running = roles.some((e) => !/career break|sabbatical/i.test(`${e.title} ${e.company}`) && (CURRENT.test(e.end.trim()) || (!e.end.trim() && e.start.trim())));
+  return running ? '' : 'Immediate (0 days)';
+}
+
+// What a CV upload filled in, and what only the person can add.
+export function profileFillSummary(p: ProfileInput) {
+  const filled = [
+    p.name && 'name',
+    (p.email || p.phone) && 'contact details',
+    p.experience.length && `${p.experience.length} role${p.experience.length === 1 ? '' : 's'}`,
+    p.yearsExperience && `${p.yearsExperience} years of experience`,
+    p.skills.length && `${p.skills.length} skills`,
+    p.education.length && 'education',
+    p.summary && 'summary',
+    p.noticePeriod && `notice period (${p.noticePeriod})`,
+  ].filter(Boolean) as string[];
+  const missing = [
+    !p.expectedSalaryLpa && 'expected CTC',
+    !p.noticePeriod && 'notice period',
+    !p.email && 'email',
+    !p.phone && 'phone',
+  ].filter(Boolean) as string[];
+  return { filled, missing };
+}

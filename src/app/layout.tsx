@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Frame, Nav } from '@/components/nav';
+import { ActivityBar, ActivityProvider, Toaster } from '@/components/activity';
 import { THEME_SCRIPT } from '@/lib/theme';
 
 export const metadata: Metadata = {
@@ -26,8 +27,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-dvh">
-        <Nav />
-        <Frame>{children}</Frame>
+        <ActivityProvider>
+          <Nav />
+          <Frame>{children}</Frame>
+          <ActivityBar />
+          <Toaster />
+        </ActivityProvider>
       </body>
     </html>
   );
