@@ -97,8 +97,14 @@ describe('in-app browser', () => {
 describe('built-in page reader', () => {
   it('renders a JavaScript-only job posting through the hosted reader', async () => {
     // An Ashby posting page is built entirely by JavaScript; a plain fetch gets an empty shell.
-    const board = await fetch('https://api.ashbyhq.com/posting-api/job-board/deel').then((r) => r.json()) as { jobs: { jobUrl: string }[] };
-    const url = board.jobs[0].jobUrl;
+    let url = '';
+    for (const [, atsType, slug] of SEED_COMPANIES) {
+      if (atsType !== 'ashby') continue;
+      const board = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${slug}`).then((r) => r.json()).catch(() => null) as { jobs?: { jobUrl: string }[] } | null;
+      url = board?.jobs?.[0]?.jobUrl || '';
+      if (url) break;
+    }
+    expect(url, 'no starter Ashby board has an open posting').not.toBe('');
     const page = await hostedReadPage(url);
     report(`| Page reader | ${page.title || '(no title)'}: ${page.markdown.length} chars from ${url} |`);
     if (page.markdown.length <= 400) report(`| Page reader text | ${page.markdown.replace(/\s+/g, ' ').slice(0, 300)} |`);
