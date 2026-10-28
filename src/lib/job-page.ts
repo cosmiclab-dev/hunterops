@@ -8,6 +8,9 @@ import { formFields, jobPostingFromHtml, mainContent, sanitizeHtml, textToHtml, 
 import { htmlToText, decodeEntities } from './text';
 import { workdayPostedOn } from './scan/sources';
 import { salaryFromText } from './salary';
+import { looksLikeBotCheck } from './bot-check';
+import { HttpError } from './http';
+import { crawlPage, loadCrawler } from './crawl4ai';
 
 export type JobPage = {
   url: string;              // the canonical posting URL
@@ -25,6 +28,7 @@ export type JobPage = {
   fields: FormField[];      // application form fields, when the site exposes them
   embedUrl: string | null;  // an official embeddable application form (Greenhouse)
   frameable: boolean | null;
+  via: 'direct' | 'crawl4ai'; // how a non-ATS page was read
 };
 
 const nice = (s: string) => s.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -76,7 +80,7 @@ export function atsRef(raw: string): AtsRef | null {
 const api = (url: string) => (process.env.ATS_API_BASE ? url.replace(/^https:\/\/[^/]+/, process.env.ATS_API_BASE) : url);
 
 function emptyPage(url: string): JobPage {
-  return { url, applyUrl: url, source: 'web', ats: null, title: '', company: '', location: null, remote: false, postedAt: null, salary: null, description: '', html: '', fields: [], embedUrl: null, frameable: null };
+  return { url, applyUrl: url, source: 'web', ats: null, title: '', company: '', location: null, remote: false, postedAt: null, salary: null, description: '', html: '', fields: [], embedUrl: null, frameable: null, via: 'direct' };
 }
 
 async function greenhouse(ref: Extract<AtsRef, { type: 'greenhouse' }>, url: string): Promise<JobPage> {
@@ -197,16 +201,14 @@ async function smartrecruiters(ref: Extract<AtsRef, { type: 'smartrecruiters' }>
   };
 }
 
-async function generic(url: string): Promise<JobPage> {
-  const res = await fetchPublic(url);
-  if (res.status >= 400) throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
-  const ld = jobPostingFromHtml(res.body);
-  const main = mainContent(res.body);
-  const html = sanitizeHtml(main.html, res.url);
+function pageFromHtml(body: string, finalUrl: string, headers: Headers | null): JobPage {
+  const ld = jobPostingFromHtml(body);
+  const main = mainContent(body);
+  const html = sanitizeHtml(main.html, finalUrl);
   const text = htmlToText(main.html) || '';
-  const host = new URL(res.url).hostname.replace(/^www\./, '');
+  const host = new URL(finalUrl).hostname.replace(/^www\./, '');
   return {
-    ...emptyPage(res.url),
+    ...emptyPage(finalUrl),
     title: ld?.title || main.title || host,
     company: ld?.company || nice(host.split('.')[0]),
     location: ld?.location || null,
@@ -216,9 +218,53 @@ async function generic(url: string): Promise<JobPage> {
     // The JobPosting text is the posting itself; the page body may add menus and footers.
     description: (ld?.description && (ld.description.length > 200 || ld.description.length > text.length / 3) ? ld.description : text).slice(0, 20000),
     html: ld?.description && ld.description.length > text.length / 3 ? textToHtml(ld.description) : html,
-    fields: formFields(res.body),
-    frameable: frameAllowed(res.headers),
+    fields: formFields(body),
+    frameable: headers ? frameAllowed(headers) : null,
   };
+}
+
+// Under this much text the page was probably built by JavaScript after load.
+const THIN_TEXT = 400;
+
+async function generic(url: string): Promise<JobPage> {
+  let res: Awaited<ReturnType<typeof fetchPublic>> | null = null;
+  let fetchErr: unknown = null;
+  try {
+    res = await fetchPublic(url);
+  } catch (err) {
+    fetchErr = err;
+  }
+  if (res && (res.status === 404 || res.status === 410)) throw new HttpError(404, 'That posting was not found. It may have closed.');
+  const direct = res && res.status < 400 ? pageFromHtml(res.body, res.url, res.headers) : null;
+  // A site that refuses readers or shows a human check stays unread; the page
+  // reader is only for pages that need a browser to render.
+  const refused = res && (res.status === 401 || res.status === 403 || res.status === 429 || looksLikeBotCheck(htmlToText(res.body) || ''));
+  const hasPosting = Boolean(res && direct && jobPostingFromHtml(res.body)?.description);
+  const needsBrowser = !refused && (fetchErr || !direct || (!hasPosting && direct.description.length < THIN_TEXT));
+  if (needsBrowser) {
+    const crawler = await loadCrawler();
+    if (crawler) {
+      try {
+        const c = await crawlPage(crawler, url);
+        if (c.status === 404 || c.status === 410) throw new HttpError(404, 'That posting was not found. It may have closed.');
+        const text = c.html ? htmlToText(c.html) || '' : '';
+        if (c.status < 400 && !looksLikeBotCheck(text || c.markdown)) {
+          const page = c.html ? pageFromHtml(c.html, c.url, null) : { ...emptyPage(c.url), description: c.markdown.slice(0, 20000), html: textToHtml(c.markdown) };
+          if (!page.description && c.markdown) Object.assign(page, { description: c.markdown.slice(0, 20000), html: textToHtml(c.markdown) });
+          if (page.description.length > (direct?.description.length ?? 0)) {
+            return { ...page, title: page.title || direct?.title || '', frameable: direct?.frameable ?? null, via: 'crawl4ai' };
+          }
+        }
+      } catch (err) {
+        if ((err as { status?: number }).status === 404 || (err as { status?: number }).status === 410) throw err;
+        // The page reader is a fallback: keep whatever the direct read found.
+      }
+    }
+  }
+  if (direct) return direct;
+  if (fetchErr) throw fetchErr;
+  if (refused) throw new HttpError(502, `${new URL(res!.url).hostname} does not let apps read its pages (HTTP ${res!.status}). Open it in Safari instead.`);
+  throw new HttpError(502, `The site answered HTTP ${res!.status}. Try again later or open it in Safari.`);
 }
 
 // A board the scanner knows (the job's company row) identifies Greenhouse postings

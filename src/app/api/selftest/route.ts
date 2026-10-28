@@ -9,6 +9,7 @@ import { ATS_FETCHERS, BOARD_FETCHERS, type CompanyRow, type Posting, type ScanC
 import { SEED_COMPANIES } from '@/lib/scan/seed-companies';
 import { loadSettings } from '@/lib/settings';
 import { bingSearch, duckSearch } from '@/lib/websearch';
+import { crawlerFrom, testCrawler } from '@/lib/crawl4ai';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -95,6 +96,11 @@ export const POST = route(async () => {
         { role: 'user', content: 'Status?' },
       ], { maxTokens: 1024, timeoutMs: 28_000 });
       return `${PROVIDERS[cfg.provider].label}, ${out.model}: "${out.content.trim().slice(0, 30)}"`;
+    }),
+    run('reader', 'Company career sites', 'Page reader (Crawl4AI)', async () => {
+      const crawler = crawlerFrom(settings);
+      if (!crawler) throw new Skip('Not set up. Optional: add your Crawl4AI server in Settings, Job search.');
+      return testCrawler(crawler);
     }),
     run('search-bing', 'Free web search', 'Bing', async () => {
       const r = await bingSearch('recruiter Bengaluru site:boards.greenhouse.io', 'w', 10);

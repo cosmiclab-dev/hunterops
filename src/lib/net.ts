@@ -36,7 +36,7 @@ export function parsePublicUrl(raw: string): URL {
   return u;
 }
 
-async function assertPublicHost(u: URL) {
+export async function assertPublicHost(u: URL) {
   if (allowPrivate()) return;
   const host = u.hostname.replace(/^\[|\]$/g, '');
   if (/^localhost$|\.local$|\.internal$/i.test(host)) throw new HttpError(400, 'That address is not on the public internet.');
@@ -48,12 +48,12 @@ async function assertPublicHost(u: URL) {
 export type FetchedPage = { url: string; status: number; contentType: string; body: string; headers: Headers };
 
 // GET with redirects followed by hand, so every hop is checked.
-export async function fetchPublic(raw: string, init: { accept?: string; method?: string; body?: string; headers?: Record<string, string> } = {}): Promise<FetchedPage> {
+export async function fetchPublic(raw: string, init: { accept?: string; method?: string; body?: string; headers?: Record<string, string>; timeoutMs?: number } = {}): Promise<FetchedPage> {
   let u = parsePublicUrl(raw);
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     await assertPublicHost(u);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PAGE_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? PAGE_TIMEOUT_MS);
     let res: Response;
     try {
       res = await fetch(u, {

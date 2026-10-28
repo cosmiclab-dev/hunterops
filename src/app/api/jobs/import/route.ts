@@ -4,7 +4,7 @@ import { loadJobPage } from '@/lib/job-page';
 import { saveJobPage } from '@/lib/jobs';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const Body = z.object({ url: z.string().min(8).max(2000), status: z.enum(['NEW', 'SAVED']).default('SAVED') });
 

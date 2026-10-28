@@ -7,7 +7,7 @@ import { grillPage } from '@/lib/jobs';
 import { clip } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const Body = z.object({ url: z.string().max(2000).optional(), jobId: z.string().uuid().optional() });
 

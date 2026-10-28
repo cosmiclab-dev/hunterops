@@ -7,6 +7,7 @@ import http from 'node:http';
 const PORT = Number(process.env.MOCK_WEB_PORT || 4020);
 const BASE = `http://127.0.0.1:${PORT}`;
 export const searches = [];
+export const crawls = [];
 
 const GH_JD = `&lt;h2&gt;About the role&lt;/h2&gt;&lt;p&gt;Senior Talent Acquisition Partner for our Bengaluru GCC.&lt;/p&gt;
 &lt;h3&gt;Requirements&lt;/h3&gt;&lt;ul&gt;&lt;li&gt;6+ years of experience in tech hiring&lt;/li&gt;&lt;li&gt;Boolean search and LinkedIn Recruiter&lt;/li&gt;&lt;li&gt;Stakeholder management&lt;/li&gt;&lt;/ul&gt;
@@ -45,6 +46,19 @@ http.createServer((req, res) => {
     const url = new URL(req.url, BASE);
     const p = url.pathname;
 
+    // A job page that only shows its posting after JavaScript runs, and a
+    // stand-in Crawl4AI server that returns the rendered page.
+    if (p === '/page/spa') return send(res, 200, '<html><head><title>Loading</title></head><body><div id="root"></div><script src="/app.js"></script></body></html>');
+    if (p === '/page/blocked') return send(res, 403, '<html><body>Access denied</body></html>');
+    if (p === '/crawl' && req.method === 'POST') {
+      if (req.headers.authorization !== `Basic ${Buffer.from('hunter:c4-e2e').toString('base64')}`) return send(res, 401, { detail: 'Not authenticated' });
+      const body = JSON.parse(raw || '{}');
+      crawls.push(body.urls?.[0]);
+      const target = String(body.urls?.[0] || '');
+      if (/blocked/.test(target)) return send(res, 200, { success: true, results: [{ url: target, success: false, status_code: 403, error_message: 'Blocked' }] });
+      const html = `<html><head><title>Talent Partner, India | Spa Jobs</title></head><body><main><h1>Talent Partner, India</h1><p>Spa Jobs is hiring a Talent Partner in Bengaluru to run end-to-end hiring for engineering and product teams.</p><h3>What you will do</h3><ul><li>Own full-cycle recruiting for 15 to 20 open roles at a time</li><li>Build sourcing plans with Boolean search, LinkedIn Recruiter and referrals</li><li>Partner with hiring managers on scorecards, interview loops and offers</li></ul><h3>What you bring</h3><ul><li>6+ years of recruiting, including tech hiring in India</li><li>Clear stakeholder management and offer negotiation</li></ul><p>Hybrid, Bengaluru. CTC 24-32 LPA.</p></main></body></html>`;
+      return send(res, 200, { success: true, results: [{ url: target, success: true, status_code: 200, html, markdown: { raw_markdown: '# Talent Partner, India', fit_markdown: '# Talent Partner, India' } }] });
+    }
     if (p === '/search' && req.method === 'POST') {
       if (req.headers['x-api-key'] !== 'serper-e2e') return send(res, 401, { message: 'Unauthorized' });
       const body = JSON.parse(raw || '{}');

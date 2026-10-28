@@ -54,7 +54,10 @@ export function textToHtml(text: string) {
 // The main readable block of a generic page: <main>, <article>, or the body.
 export function mainContent(html: string): { title: string; html: string } {
   const root = parse(html, { comment: false });
-  const title = decodeEntities(root.querySelector('title')?.text || root.querySelector('h1')?.text || '').trim();
+  // "Role | Company careers" in <title>: the page's own h1 is the cleaner name.
+  const docTitle = decodeEntities(root.querySelector('title')?.text || '').trim();
+  const h1 = decodeEntities(root.querySelector('h1')?.text || '').trim();
+  const title = h1 && h1.length < 140 && (!docTitle || docTitle.includes(h1)) ? h1 : docTitle || h1;
   const pick = root.querySelector('main') || root.querySelector('article') || root.querySelector('[role=main]') || root.querySelector('body') || root;
   return { title, html: pick.toString() };
 }

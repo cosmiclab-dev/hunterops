@@ -81,6 +81,8 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
 
   const [search, setSearch] = useState({ provider: initial.search_provider.value && initial.search_provider.value !== 'none' ? initial.search_provider.value : 'free', key: '' });
   const [searchMsg, setSearchMsg] = useState({ msg: '', err: '' });
+  const [reader, setReader] = useState({ url: initial.crawl4ai_url?.value || '', token: '' });
+  const [readerMsg, setReaderMsg] = useState({ msg: '', err: '' });
   const [banned, setBanned] = useState(initial.banned_words_extra.value || '');
   const [writing, setWriting] = useState({ tone: initial.writing_tone?.value || 'warm', length: initial.email_length?.value || 'standard', signature: initial.email_signature?.value || '' });
   const [writingMsg, setWritingMsg] = useState({ msg: '', err: '' });
@@ -147,6 +149,29 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
       setMail({ msg: 'Saved.', err: '' });
     } catch (e) {
       setMail({ msg: '', err: (e as Error).message });
+    }
+  }
+
+  async function saveReader() {
+    setReaderMsg({ msg: '', err: '' });
+    try {
+      const values: Record<string, string | null> = { crawl4ai_url: reader.url.trim() || null };
+      if (reader.token) values.crawl4ai_token = reader.token;
+      await save(values);
+      setReader({ ...reader, token: '' });
+      setReaderMsg({ msg: reader.url.trim() ? 'Saved. Pages that need a browser now open through your page reader.' : 'Saved. The page reader is off.', err: '' });
+    } catch (e) {
+      setReaderMsg({ msg: '', err: (e as Error).message });
+    }
+  }
+
+  async function testReader() {
+    setReaderMsg({ msg: 'Testing… (up to 30 seconds)', err: '' });
+    try {
+      const out = await api<{ detail: string }>('/api/settings/test-reader', { method: 'POST', json: { url: reader.url, token: reader.token || undefined } });
+      setReaderMsg({ msg: `Working. ${out.detail}`, err: '' });
+    } catch (e) {
+      setReaderMsg({ msg: '', err: (e as Error).message });
     }
   }
 
@@ -328,6 +353,23 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         </div>
         <Button className="self-start" onClick={saveSearch}>Save</Button>
         <Status {...searchMsg} />
+      </Section>
+      <Section title="Page reader (Crawl4AI)" id="reader" desc="Optional. Some job sites build the posting with JavaScript, so a plain read finds almost nothing. Point this at a Crawl4AI server on your own VPS and those pages open through it. Sites that block automated readers stay blocked.">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="c4url">Server address</Label>
+            <Input id="c4url" inputMode="url" autoComplete="off" value={reader.url} onChange={(e) => setReader({ ...reader, url: e.target.value })} placeholder="https://crawl.yourdomain.com" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="c4tok">Password or token</Label>
+            <Input id="c4tok" type="password" autoComplete="off" value={reader.token} onChange={(e) => setReader({ ...reader, token: e.target.value })} placeholder={s.crawl4ai_token.hint ? `Saved: ${s.crawl4ai_token.hint}` : 'user:password or token'} />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={saveReader}>Save</Button>
+          <Button variant="outline" onClick={testReader} disabled={!reader.url.trim()}>Test</Button>
+        </div>
+        <Status {...readerMsg} />
       </Section>
         </Group>
         <Group id="writing" title="Writing">
