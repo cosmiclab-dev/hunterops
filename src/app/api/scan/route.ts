@@ -3,7 +3,8 @@ import { loadSettings } from '@/lib/settings';
 import { runScan } from '@/lib/scan/scanner';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// 45 s of fetching, then saving and scoring.
+export const maxDuration = 120;
 
 export const POST = route(async (req: Request) => {
   const body = await readJson<{ force?: boolean; companyIds?: string[] }>(req);

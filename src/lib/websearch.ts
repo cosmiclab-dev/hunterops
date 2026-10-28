@@ -165,12 +165,19 @@ export function splitResultTitle(title: string, url: string): { role: string; co
   const at = t.match(/^(.*?)\s+at\s+(.+)$/i);
   if (at) return { role: at[1].trim(), company: at[2].trim() };
   const dash = t.split(/\s+[-–|]\s+/);
-  if (dash.length >= 2) return { role: dash[0].trim(), company: dash[dash.length - 1].trim() };
+  let host = '';
+  try { host = new URL(url).hostname; } catch { /* keep empty */ }
+  // Lever titles put the company first: "Acme - Senior Recruiter".
+  if (dash.length >= 2 && /(^|\.)lever\.co$/.test(host)) return { role: dash.slice(1).join(' - ').trim(), company: dash[0].trim() };
+  // "Recruiter - Bengaluru, India": the tail is a place, not the company.
+  const placeTail = dash.length >= 2 && /\b(remote|india|bengaluru|bangalore|hybrid|onsite|usa|uk|singapore)\b/i.test(dash[dash.length - 1]);
+  if (dash.length >= 2 && !placeTail) return { role: dash[0].trim(), company: dash[dash.length - 1].trim() };
+  const roleText = placeTail ? dash[0].trim() : t;
   let company = '';
   try {
     const u = new URL(url);
     const parts = u.pathname.split('/').filter(Boolean);
     company = /greenhouse|lever|ashby/.test(u.hostname) ? parts[0] || '' : u.hostname.split('.')[0];
   } catch { /* keep empty */ }
-  return { role: t, company: company.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
+  return { role: roleText, company: company.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) };
 }

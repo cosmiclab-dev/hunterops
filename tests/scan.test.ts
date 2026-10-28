@@ -59,3 +59,12 @@ describe('scanner', () => {
     expect(workdayPostedOn('Posted 3 Days Ago', now)).toBe('2026-10-24T00:00:00.000Z');
   });
 });
+
+describe('title matcher stems', () => {
+  it('finds Recruiting and Sourcing titles from the default keywords', () => {
+    const m = titleMatcher(['recruiter', 'sourcer', 'talent acquisition'], ['intern']);
+    for (const t of ['Recruiting Coordinator', 'Technical Recruiting Lead', 'Sourcing Specialist', 'Senior Recruiter']) expect(m(t), t).toBe(true);
+    expect(m('Recruiting Intern')).toBe(false);
+    expect(m('Software Engineer')).toBe(false);
+  });
+});

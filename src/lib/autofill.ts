@@ -28,7 +28,8 @@ export const STANDARD_FIELDS: FormField[] = [
   { key: 'why_company', label: 'Why do you want to work here?', type: 'textarea', required: false },
 ];
 
-type Rule = [RegExp, (p: ProfileInput) => string, string?];
+// The fourth item marks rules that also answer a question-style label ("When can you join?").
+type Rule = [RegExp, (p: ProfileInput) => string, string?, boolean?];
 const first = (p: ProfileInput) => p.name.trim().split(/\s+/)[0] || '';
 const last = (p: ProfileInput) => p.name.trim().split(/\s+/).slice(1).join(' ');
 const lpa = (n: number | null) => (n ? `${n} LPA` : '');
@@ -40,31 +41,48 @@ const RULES: Rule[] = [
   [/preferred name/i, first],
   [/full\s*name|^name\b|your name|legal name/i, (p) => p.name],
   [/e-?mail/i, (p) => p.email],
-  [/phone|mobile|contact number/i, (p) => p.phone],
+  [/phone( number)?\b(?! screen| interview| call)|mobile|contact number/i, (p) => p.phone],
   [/linked\s*in/i, (p) => p.linkedin],
   [/portfolio|website|personal (site|url)|github/i, (p) => p.portfolio],
-  [/expected (ctc|salary|compensation|pay)|salary expectation|desired (salary|pay)/i, (p) => lpa(p.expectedSalaryLpa), 'Your expected CTC from Profile.'],
-  [/current (ctc|salary|compensation)|present (ctc|salary)/i, (p) => lpa(p.currentCtcLpa)],
-  [/notice period|when can you (start|join)|earliest start|availability to join|joining date/i, (p) => p.noticePeriod],
+  [/expected (ctc|salary|compensation|pay)|salary expectation|desired (salary|pay)/i, (p) => lpa(p.expectedSalaryLpa), 'Your expected CTC from Profile.', true],
+  [/current (ctc|salary|compensation)|present (ctc|salary)/i, (p) => lpa(p.currentCtcLpa), undefined, true],
+  [/notice period|when can you (start|join)|earliest start|availability to join|joining date/i, (p) => p.noticePeriod, undefined, true],
   [/current (company|employer|organi[sz]ation)|most recent (company|employer)|^company$|^org$/i, (p) => p.experience[0]?.company || ''],
   [/current (title|role|designation|position)|job title|most recent title/i, (p) => p.experience[0]?.title || ''],
-  [/years of (relevant )?experience|total experience|how many years/i, (p) => (p.yearsExperience ? String(p.yearsExperience) : '')],
-  [/(current )?(location|city)|where are you based|address/i, (p) => p.location],
+  [/years of (relevant )?experience|total experience|how many years/i, (p) => (p.yearsExperience ? String(p.yearsExperience) : ''), undefined, true],
+  [/(current )?(location|city)|where are you based|^address/i, (p) => p.location],
+  [/where are you (currently )?(based|located)/i, (p) => p.location, undefined, true],
   [/school|university|college/i, (p) => p.education[0]?.school || ''],
   [/degree|qualification/i, (p) => p.education[0]?.degree || ''],
 ];
 
 const FREE_TEXT = /why|tell us|describe|cover letter|additional information|anything else|motivat|interest(ed)? in|about yourself|summary|example of|how would you/i;
 
+// Only the person knows these; a profile field would be a wrong answer.
+const ONLY_YOU = /hear about|how did you (find|learn)|refer(red|rer|ral)|source of application/i;
+// Yes/no questions ("Will you require sponsorship?") are never filled from a profile field.
+const YES_NO = /^\s*(are|do|does|did|will|would|have|has|had|is|can|could|should|were|was)\b/i;
+const QUESTION = /\?\s*\*?\s*$|^\s*(what|when|where|which|how|who)\b/i;
+
 export function mapField(f: FormField, p: ProfileInput): Answer {
   const base = { key: f.key, label: f.label, type: f.type, required: f.required, options: f.options };
   if (f.type === 'file') {
     return { ...base, value: /cover/i.test(f.label) ? '' : 'Attach your tailored resume (Resume tab)', source: 'you', note: /cover/i.test(f.label) ? 'Use the cover letter from the Email tab.' : undefined };
   }
+  if (ONLY_YOU.test(f.label)) return { ...base, value: '', source: 'you', note: 'Only you know this one.' };
+  if (YES_NO.test(f.label)) return { ...base, value: '', source: 'ai' };
+  const question = QUESTION.test(f.label);
   if (!FREE_TEXT.test(f.label) || f.type !== 'textarea') {
-    for (const [re, get, note] of RULES) {
-      if (re.test(f.label) || re.test(f.key.replace(/[_\-[\]]+/g, ' '))) {
+    for (const [re, get, note, answersQuestion] of RULES) {
+      if (question && !answersQuestion) continue;
+      if (re.test(f.label) || (!question && re.test(f.key.replace(/[_\-[\]]+/g, ' ')))) {
         const value = get(p);
+        // A dropdown only takes one of its own options.
+        if (f.options?.length) {
+          const hit = value && f.options.find((o) => o.trim().toLowerCase() === value.trim().toLowerCase());
+          if (hit) return { ...base, value: hit, source: 'profile', note };
+          return { ...base, value: '', source: 'ai' };
+        }
         return { ...base, value, source: value ? 'profile' : 'you', note: value ? note : 'Add this to your Profile once and it fills every form.' };
       }
     }

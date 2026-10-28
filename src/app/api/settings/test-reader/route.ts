@@ -12,6 +12,8 @@ export const POST = route(async (req: Request) => {
   const saved = crawlerFrom(await loadSettings());
   const base = (o.url || '').trim().replace(/\/+$/, '') || saved?.base;
   if (!base) throw new HttpError(400, 'Add the page reader address first.');
-  const detail = await testCrawler({ base, token: o.token || saved?.token || null });
+  // The saved token only goes to the saved address.
+  if (base !== saved?.base && !o.token && saved?.token) throw new HttpError(400, 'Type the password or token to test a new address.');
+  const detail = await testCrawler({ base, token: o.token || (base === saved?.base ? saved?.token : null) || null });
   return ok({ ok: true, detail });
 });

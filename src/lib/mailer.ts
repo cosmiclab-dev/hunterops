@@ -9,7 +9,7 @@ export async function sendApproved(settings: Settings, email: { id: string; toEm
   const user = settings.get('smtp_user');
   const pass = settings.get('smtp_app_password');
   if (!user || !pass) throw new HttpError(503, 'Add your Gmail address and app password in Settings to send email.');
-  const cap = Number(settings.get('daily_email_cap') || 20);
+  const cap = dailyCap(settings.get('daily_email_cap'));
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const sentToday = await prisma.email.count({ where: { status: 'SENT', sentAt: { gte: since } } });
   if (sentToday >= cap) throw new HttpError(429, `Daily cap reached (${cap} emails in 24 hours). Change it in Settings.`);
@@ -25,6 +25,12 @@ export async function sendApproved(settings: Settings, email: { id: string; toEm
   return info.messageId as string;
 }
 
+// A typo in Settings must never switch the cap off.
+export function dailyCap(raw: string | null | undefined) {
+  const n = Number(raw);
+  return raw && Number.isInteger(n) && n >= 0 ? n : 20;
+}
+
 // SMTP_HOST/SMTP_PORT exist for local testing against a mail sink; production uses Gmail.
 export function gmailTransport(user: string, pass: string) {
   const port = Number(process.env.SMTP_PORT || 465);
@@ -33,6 +39,10 @@ export function gmailTransport(user: string, pass: string) {
     port,
     secure: port === 465,
     auth: { user, pass: pass.replace(/\s+/g, '') },
+    // Fail well inside the route's time limit instead of hanging on a dead connection.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
     ...(process.env.SMTP_HOST ? { tls: { rejectUnauthorized: false } } : {}),
   });
 }

@@ -94,7 +94,8 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
   const [careersUrl, setCareersUrl] = useState('');
   const [srcMsg, setSrcMsg] = useState({ msg: '', err: '' });
 
-  const def = providers[provider];
+  // An unknown saved provider (a typo in LLM_PROVIDER) must not blank the page.
+  const def = providers[provider] ?? providers.opencode;
   const keyInfo = s[`llm_key_${provider}`];
   const effectiveModel = model || def.defaultModel;
 

@@ -142,7 +142,7 @@ async function lever(ref: Extract<AtsRef, { type: 'lever' }>, url: string): Prom
 async function ashby(ref: Extract<AtsRef, { type: 'ashby' }>, url: string): Promise<JobPage> {
   const data = await fetchPublicJson(api(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(ref.slug)}?includeCompensation=true`));
   const j = (data.jobs || []).find((x: any) => x.id === ref.id || String(x.jobUrl || '').includes(ref.id));
-  if (!j) throw Object.assign(new Error('closed'), { status: 404 });
+  if (!j) throw new HttpError(404, 'That posting was not found. It may have closed.');
   const page = emptyPage(j.jobUrl || url);
   return {
     ...page,
@@ -260,9 +260,13 @@ async function generic(url: string): Promise<JobPage> {
       }
     }
   }
+  // A human-check page served with HTTP 200 is not the posting.
+  if (refused) {
+    const host = new URL(res!.url).hostname;
+    throw new HttpError(502, res!.status < 400 ? `${host} shows a "are you human" check to apps. Open it in Safari instead.` : `${host} does not let apps read its pages (HTTP ${res!.status}). Open it in Safari instead.`);
+  }
   if (direct) return direct;
   if (fetchErr) throw fetchErr;
-  if (refused) throw new HttpError(502, `${new URL(res!.url).hostname} does not let apps read its pages (HTTP ${res!.status}). Open it in Safari instead.`);
   throw new HttpError(502, `The site answered HTTP ${res!.status}. Try again later or open it in Safari.`);
 }
 

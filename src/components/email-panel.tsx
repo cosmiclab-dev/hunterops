@@ -56,7 +56,7 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
     setErr('');
     try {
       const { email: e } = await api<{ email: EmailRow }>(`/api/emails/${email.id}/send`, {
-        method: 'POST', json: { approve: true, subject: email.subject, body: email.body },
+        method: 'POST', json: { approve: true, subject: email.subject, body: email.body, toEmail: email.toEmail },
       });
       onChange(e);
     } catch (e) {

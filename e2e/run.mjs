@@ -211,7 +211,7 @@ await step('draft a recruiter email (AIDA); Anti-Slop removes "delve"', async ()
 
 await step('nothing is sent without approval or with a stale draft', async () => {
   assert.equal((await call('POST', `/api/emails/${email.id}/send`, {})).status, 400);
-  assert.equal((await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: 'old text' })).status, 409);
+  assert.equal((await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: 'old text', toEmail: email.toEmail })).status, 409);
   assert.equal(fs.readFileSync(MAIL, 'utf8').trim(), '');
 });
 
@@ -219,7 +219,7 @@ await step('edit the draft, then approve and send it', async () => {
   const edited = await call('PATCH', `/api/emails/${email.id}`, { body: `${email.body}\n\nP.S. Happy to share references.` });
   assert.equal(edited.status, 200);
   email = edited.data.email;
-  const sent = await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: email.body });
+  const sent = await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: email.body, toEmail: email.toEmail });
   assert.equal(sent.status, 200, JSON.stringify(sent.data));
   assert.equal(sent.data.email.status, 'SENT');
   const mails = fs.readFileSync(MAIL, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
@@ -230,7 +230,7 @@ await step('edit the draft, then approve and send it', async () => {
 });
 
 await step('a sent email cannot be sent twice, edited or deleted', async () => {
-  assert.equal((await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: email.body })).status, 409);
+  assert.equal((await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: email.body, toEmail: email.toEmail })).status, 409);
   assert.equal((await call('PATCH', `/api/emails/${email.id}`, { body: 'x' })).status, 409);
   assert.equal((await call('DELETE', `/api/emails/${email.id}`)).status, 409);
 });
@@ -238,7 +238,7 @@ await step('a sent email cannot be sent twice, edited or deleted', async () => {
 await step('daily cap is enforced', async () => {
   for (let i = 0; i < 2; i++) {
     const d = (await call('POST', '/api/emails', { jobId: ids.us, toEmail: `r${i}@beta.example`, kind: 'follow_up' })).data.email;
-    const s = await call('POST', `/api/emails/${d.id}/send`, { approve: true, subject: d.subject, body: d.body });
+    const s = await call('POST', `/api/emails/${d.id}/send`, { approve: true, subject: d.subject, body: d.body, toEmail: d.toEmail });
     if (i === 0) assert.equal(s.status, 200);
     else {
       assert.equal(s.status, 429);

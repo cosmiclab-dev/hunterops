@@ -20,6 +20,10 @@ export function route<A extends unknown[]>(fn: (...args: A) => Promise<Response>
         const first = err.issues[0];
         return NextResponse.json({ error: `${first.path.join('.') || 'body'}: ${first.message}` }, { status: 400 });
       }
+      const status = (err as { status?: unknown }).status;
+      if (typeof status === 'number' && status >= 400 && status < 600) return NextResponse.json({ error: (err as Error).message }, { status });
+      // A unique constraint hit by a double tap or a second tab: the thing already exists.
+      if ((err as { code?: string }).code === 'P2002') return NextResponse.json({ error: 'That is already saved.' }, { status: 409 });
       console.error('[api]', err);
       return NextResponse.json({ error: 'Something went wrong on the server.' }, { status: 500 });
     }
