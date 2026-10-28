@@ -16,7 +16,7 @@ export type LlmConfig = {
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 // `session` groups the calls of one task (a draft and its anti-slop rewrite) so
 // gateways such as OpenCode Go can route them together and reuse the prompt cache.
-export type ChatOptions = { maxTokens?: number; temperature?: number; json?: boolean; timeoutMs?: number; session?: string };
+export type ChatOptions = { maxTokens?: number; temperature?: number; json?: boolean; timeoutMs?: number; session?: string; busyRetries?: number };
 export type ChatResult = { content: string; model: string; usage: unknown; cut?: boolean };
 
 export type Overrides = { provider?: string; model?: string; key?: string; baseUrl?: string };
@@ -115,6 +115,12 @@ function buildRequest(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions
   };
 }
 
+// "Retry-After: 10" or "Retry after 10s" in the body; 5 s when neither says.
+export function retryAfterMs(header: string | null, body: string) {
+  const secs = Number(header) || Number(body.match(/retry after (\d+)\s*s/i)?.[1]) || 5;
+  return Math.min(Math.max(secs, 1), 30) * 1000;
+}
+
 function readContent(cfg: LlmConfig, data: any): string | undefined {
   if (cfg.format === 'anthropic') {
     const blocks = Array.isArray(data?.content) ? data.content : [];
@@ -188,6 +194,17 @@ async function send(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions, 
     // names the field in its error; retry once with the plainest request.
     if (res.status === 400 && (opts.json || opts.temperature !== undefined)) {
       return again({ ...opts, json: false, temperature: undefined });
+    }
+    // Busy or rate-limited: wait as long as the provider asks (up to 30 s) and
+    // try again, twice at most, while the time budget allows.
+    const tries = opts.busyRetries ?? 0;
+    if ((res.status === 429 || res.status === 503 || (res.status === 402 && /retry after/i.test(raw))) && tries < 2) {
+      const wait = retryAfterMs(res.headers.get('retry-after'), raw);
+      if (timeLeft() - wait > 30_000) {
+        console.warn('[llm] busy', res.status, `retrying in ${Math.round(wait / 1000)}s`);
+        await new Promise((r) => setTimeout(r, wait));
+        return again({ ...opts, busyRetries: tries + 1 });
+      }
     }
     console.error('[llm] upstream', res.status, raw.slice(0, 500));
     throw new HttpError(502, upstreamHint(cfg, res.status, raw));

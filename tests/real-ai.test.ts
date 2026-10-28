@@ -122,3 +122,49 @@ describe('a free provider that allows one reply at a time', () => {
     vi.unstubAllEnvs();
   });
 });
+
+describe('answers and letters go out as written', () => {
+  it('fills a pay question from the profile and gives the AI the application facts', async () => {
+    const { mapField, buildAnswerSheet, SLOT } = await import('@/lib/autofill');
+    const { emailMessages } = await import('@/lib/prompts');
+    const p = normalizeProfile({ name: 'Divya Rao', location: 'Bengaluru', expectedSalaryLpa: 7.5, noticePeriod: 'Immediate (0 days)', acceptRemote: true, onsiteCities: ['Bengaluru'] });
+    const pay = mapField({ key: 'q1', label: 'What are your compensation expectations for this position?', type: 'textarea', required: true }, p);
+    expect(pay).toMatchObject({ value: '7.5 LPA', source: 'profile' });
+
+    let sent = '';
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
+      sent = JSON.parse(init.body as string).messages.map((m: { content: string }) => m.content).join('\n');
+      return reply('{"answers":{"q2":"No, I am based in Bengaluru.","q3":"I cut time-to-fill by [X]%."}}');
+    }));
+    const sheet = await buildAnswerSheet(cfg, { profile: p, company: 'Acme', role: 'TA Partner', jd: 'x', fields: [
+      { key: 'q2', label: 'This role is onsite in Phoenix, AZ. Is that a reasonable commute?', type: 'text', required: true },
+      { key: 'q3', label: 'Why do you want this job?', type: 'textarea', required: true },
+    ] });
+    expect(sent).toMatch(/Expected CTC: 7.5 LPA/);
+    expect(sent).toMatch(/Open to: remote;.*on-site in Bengaluru/);
+    expect(sent).toMatch(/never write placeholders/);
+    expect(sheet.answers[1]).toMatchObject({ source: 'you', note: expect.stringMatching(/brackets/) });
+    expect(SLOT.test('Hi [Name],')).toBe(true);
+    expect(SLOT.test('[Check]')).toBe(false);
+
+    const letter = emailMessages({ kind: 'cover_letter', framework: 'aida', profileText: 'x', company: 'Acme', facts: 'notice period Immediate (0 days)' });
+    expect(letter[0].content).toMatch(/Dear Acme hiring team/);
+    expect(letter[0].content).not.toMatch(/Hi \[Name\]/);
+    expect(letter[1].content).toMatch(/Immediate/);
+  });
+});
+
+describe('a busy provider', () => {
+  it('waits as asked and tries again, twice at most', async () => {
+    const { chat: send, retryAfterMs } = await import('@/lib/llm/client');
+    expect(retryAfterMs(null, 'The API is at its limit. Retry after 10s')).toBe(10_000);
+    expect(retryAfterMs('2', '')).toBe(2_000);
+    expect(retryAfterMs(null, '')).toBe(5_000);
+    const busy = () => new Response('{"error":"busy"}', { status: 503, headers: { 'retry-after': '1' } });
+    const fetch = vi.fn().mockResolvedValueOnce(busy()).mockResolvedValueOnce(reply('fine'));
+    vi.stubGlobal('fetch', fetch);
+    expect((await send(cfg, [{ role: 'user', content: 'x' }])).content).toBe('fine');
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => busy()));
+    await expect(send(cfg, [{ role: 'user', content: 'x' }])).rejects.toThrow();
+  }, 15_000);
+});

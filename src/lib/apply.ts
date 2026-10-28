@@ -5,7 +5,7 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from './db';
 import { HttpError } from './http';
-import { buildAnswerSheet, STANDARD_FIELDS, type Answer } from './autofill';
+import { buildAnswerSheet, SLOT, STANDARD_FIELDS, type Answer } from './autofill';
 import { generateEmail } from './email-generator';
 import { loadJobPage } from './job-page';
 import { llmConfig } from './llm/client';
@@ -135,6 +135,9 @@ export async function runApplication(jobId: string, task: Tracker) {
     if (letter.status === 'rejected') notes.push(`Cover letter not written: ${(letter.reason as Error).message}`);
 
     const coverLetter = letter.status === 'fulfilled' ? letter.value.body : null;
+    if (coverLetter && SLOT.test(coverLetter)) notes.push('The cover letter has a part in [brackets] to fill in before you send it.');
+    const toFill = sheet.status === 'fulfilled' ? sheet.value.answers.filter((a) => a.value && SLOT.test(a.value)).length : 0;
+    if (toFill) notes.push(`${toFill} answer${toFill > 1 ? 's have' : ' has'} a part in [brackets] to fill in.`);
     const resumeId = resume.status === 'fulfilled' ? resume.value.resume.id : null;
     const answers = sheet.value.answers;
     // The cover letter question on the form gets the letter itself.

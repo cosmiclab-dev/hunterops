@@ -115,6 +115,10 @@ await step('Apply with AI on a real Greenhouse, Lever or Ashby job reads its rea
   if (REAL_AI) {
     assert.ok(app.resume_id, `no tailored resume: ${JSON.stringify(app.notes)}`);
     assert.ok(app.letter > 200, `no cover letter: ${JSON.stringify(app.notes)}`);
+    // Nothing goes out with a [X] or [Name] slot left in it.
+    const text = sql(`SELECT cover_letter || ' ' || answers::text FROM applications WHERE job_id = '${id}'`);
+    const slot = text.match(/\[(?!Check\])[A-Za-z][A-Za-z ]{0,20}\]/);
+    assert.ok(!slot, `placeholder left in the letter or answers: ${slot?.[0]}`);
     const score = sql(`SELECT score FROM reports WHERE job_id = '${id}' ORDER BY created_at DESC LIMIT 1`);
     assert.ok(Number(score) >= 1, `evaluation without a score (${score}): ${JSON.stringify(app.notes)}`);
     await page.getByTestId('apply-evaluation').waitFor();

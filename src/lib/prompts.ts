@@ -3,6 +3,7 @@
 import type { ChatMessage } from './llm/client';
 import { antiSlopInstruction } from './modules/anti-slop';
 
+const NO_FABRICATION_FINAL = 'Never invent numbers, employers, titles, tools or achievements: use only facts in the profile. This text is sent as it is, so never write placeholders such as [X], [Name] or [Company]; if a figure is missing, write the sentence without it.';
 const NO_FABRICATION = 'Never invent numbers, employers, titles, tools or achievements. Use a figure only if the source text contains it. Where a number is needed and missing, write a bracketed slot such as [X], [N] roles or ₹[X] lakh so the person fills in a figure they can defend in an interview.';
 const JSON_ONLY = 'Reply with one JSON object and nothing else. No markdown fences.';
 
@@ -82,9 +83,11 @@ export const TONES: Record<WritingTone, string> = {
 export function emailMessages(a: {
   kind: EmailKind; framework: EmailFramework; profileText: string; company: string; role?: string; jd?: string;
   recipientName?: string; recipientTitle?: string; previous?: string; senderName?: string;
-  tone?: WritingTone; short?: boolean;
+  tone?: WritingTone; short?: boolean; facts?: string;
 }): ChatMessage[] {
-  const first = a.recipientName ? a.recipientName.split(' ')[0] : '[Name]';
+  // A cover letter goes out with the application as written: no slots to fill.
+  const letter = a.kind === 'cover_letter';
+  const first = a.recipientName ? a.recipientName.split(' ')[0] : letter ? '' : '[Name]';
   const words = a.kind === 'cover_letter' ? (a.short ? 150 : 200) : (a.short ? 80 : 120);
   const system = `You write job-search emails that busy recruiters answer. ${EMAIL_KINDS[a.kind]}
 
@@ -93,10 +96,10 @@ Structure: ${EMAIL_FRAMEWORKS[a.framework]}
 Rules:
 - Subject: under 8 words, specific (role or company name), no clickbait.
 - Body: under ${words} words. Short paragraphs. One clear, small ask (a 10-minute call, a referral, the right contact).
-- Open with "Hi ${first}," and close with the candidate's first name only.
+- ${first ? `Open with "Hi ${first},"` : `Open with "Dear ${a.company} hiring team,"`} and close with the candidate's first name only.
 - Tone: ${TONES[a.tone ?? 'warm']}
 - No "I hope this finds you well", no "I am writing to express", no emojis.
-- ${NO_FABRICATION}
+- ${letter ? NO_FABRICATION_FINAL : NO_FABRICATION}
 - ${antiSlopInstruction()}
 
 ${JSON_ONLY} Shape: { "subject": "...", "body": "..." }`;
@@ -107,6 +110,7 @@ ${JSON_ONLY} Shape: { "subject": "...", "body": "..." }`;
     a.jd ? `Job description (excerpt):\n"""\n${a.jd.slice(0, 4000)}\n"""` : null,
     a.previous ? `Earlier email that got no reply:\n"""\n${a.previous}\n"""` : null,
     `Candidate profile:\n"""\n${a.profileText}\n"""`,
+    a.facts ? `Availability: ${a.facts}` : null,
   ].filter(Boolean);
   return [{ role: 'system', content: system }, { role: 'user', content: lines.join('\n\n') }];
 }

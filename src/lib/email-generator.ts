@@ -47,6 +47,7 @@ export async function generateEmail(settings: Settings, a: {
     recipientName: a.recipientName,
     recipientTitle: a.recipientTitle,
     previous: a.previous,
+    facts: a.kind === 'cover_letter' && a.profile.noticePeriod ? `notice period ${a.profile.noticePeriod}` : undefined,
     tone: (['warm', 'formal', 'direct'].includes(settings.get('writing_tone') || '') ? settings.get('writing_tone') : 'warm') as WritingTone,
     short: settings.get('email_length') === 'short',
   }), { maxTokens: 1200, temperature: 0.5, extra: extraBanned(settings) });

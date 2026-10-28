@@ -170,6 +170,19 @@ export function profileToText(p: Partial<ProfileInput>) {
   return lines.join('\n');
 }
 
+// The facts application forms ask for (pay, notice, where they can work).
+// Kept out of profileToText so a resume never prints the candidate's pay.
+export function applicationFacts(p: Partial<ProfileInput>) {
+  const where = [p.acceptRemote ? 'remote' : '', p.acceptHybrid ? 'hybrid' : '', p.onsiteCities?.length ? `on-site in ${p.onsiteCities.join(', ')}` : ''].filter(Boolean);
+  return [
+    p.expectedSalaryLpa ? `Expected CTC: ${p.expectedSalaryLpa} LPA (INR lakh per year)` : 'Expected CTC: not given',
+    p.currentCtcLpa ? `Current or last CTC: ${p.currentCtcLpa} LPA` : '',
+    p.noticePeriod ? `Notice period: ${p.noticePeriod}` : '',
+    p.location ? `Based in: ${p.location}` : '',
+    where.length ? `Open to: ${where.join('; ')}` : '',
+  ].filter(Boolean).join('\n');
+}
+
 const CURRENT = /^(present|current|now|ongoing|till date|to date|today)$/i;
 
 // A CV says whether someone is working now: no role still running means they
