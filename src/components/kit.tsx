@@ -4,41 +4,51 @@ import { cn } from '@/lib/utils';
 
 export function PageHeader({ eyebrow, title, sub, action, className }: { eyebrow?: string; title: string; sub?: React.ReactNode; action?: React.ReactNode; className?: string }) {
   return (
-    <div className={cn('flex items-start justify-between gap-4', className)}>
+    // On phones the action sits above the large title, like an iOS toolbar button.
+    <div className={cn('flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4', className)}>
       <div className="min-w-0">
         {eyebrow && <p className="label-caps text-muted-foreground">{eyebrow}</p>}
         <h1 className="page-title mt-1">{title}</h1>
-        {sub && <p className="mt-1 text-sm leading-6 text-muted-foreground">{sub}</p>}
+        {sub && <p className="mt-2 max-w-2xl text-[15px] leading-[1.47] text-muted-foreground sm:text-[17px]">{sub}</p>}
       </div>
-      {action && <div className="shrink-0">{action}</div>}
+      {action && <div className="order-first shrink-0 self-end sm:order-last sm:self-auto">{action}</div>}
     </div>
   );
 }
 
 const TONES = {
-  primary: 'bg-muted text-foreground',
+  primary: 'bg-primary/10 text-primary',
   success: 'bg-success/10 text-success',
   warning: 'bg-warning/15 text-warning',
   info: 'bg-info/10 text-info',
   muted: 'bg-muted text-muted-foreground',
   danger: 'bg-destructive/10 text-destructive',
 } as const;
+// iOS app-icon colours for icon tiles: solid, rounded, white glyph.
+const ICON_TONES: Record<Tone, string> = {
+  primary: 'bg-[#007AFF]',
+  success: 'bg-[#34C759]',
+  warning: 'bg-[#FF9500]',
+  info: 'bg-[#30B0C7]',
+  muted: 'bg-[#8E8E93]',
+  danger: 'bg-[#FF3B30]',
+};
 export type Tone = keyof typeof TONES;
 
-// Icons sit on a quiet grey tile; colour is kept for status (danger) only.
+// Rounded, colourful icon tiles like iOS Settings.
 export function IconChip({ icon: Icon, tone = 'primary', className }: { icon: LucideIcon; tone?: Tone; className?: string }) {
   return (
-    <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl', tone === 'danger' ? TONES.danger : 'bg-muted text-foreground/80', className)}>
-      <Icon className="h-[18px] w-[18px]" />
+    <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.25)]', ICON_TONES[tone], className)}>
+      <Icon className="h-[18px] w-[18px]" strokeWidth={2.2} />
     </span>
   );
 }
 
 export function StatTile({ label, value, hint, icon, tone = 'primary', href }: { label: string; value: React.ReactNode; hint?: React.ReactNode; icon: LucideIcon; tone?: Tone; href?: string }) {
   const body = (
-    <div className="surface flex h-full flex-col gap-3 p-4 transition-colors hover:border-foreground/20">
+    <div className="surface flex h-full flex-col gap-3 p-4 transition-transform active:scale-[0.98] sm:p-5">
       <div className="flex items-center justify-between">
-        <span className="text-[13px] font-medium text-muted-foreground">{label}</span>
+        <span className="text-sm text-muted-foreground">{label}</span>
         <IconChip icon={icon} tone={tone} className="h-8 w-8 rounded-lg" />
       </div>
       <div className="text-[30px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{value}</div>
@@ -52,7 +62,7 @@ export function Section({ title, action, children, className }: { title: string;
   return (
     <section className={cn('flex flex-col gap-3', className)}>
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-bold tracking-tight">{title}</h2>
+        <h2 className="text-[21px] font-semibold leading-tight tracking-[-0.015em]">{title}</h2>
         {action}
       </div>
       {children}

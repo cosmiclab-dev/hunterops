@@ -37,7 +37,9 @@ async function open(viewport) {
   return page;
 }
 const noSideScroll = async (page, where) => {
-  const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  // On a phone, overflow widens the layout viewport (innerWidth grows with it),
+  // so compare against the screen width instead.
+  const over = await page.evaluate(() => document.documentElement.scrollWidth - Math.min(window.innerWidth, screen.width));
   assert.ok(over <= 0, `${where} scrolls sideways by ${over}px`);
 };
 
@@ -281,6 +283,17 @@ for (const [path, name] of [['/', 'p00-home'], ['/discover', 'p01-discover'], ['
 const tabs = phone.getByRole('navigation', { name: 'Tabs' });
 for (const label of ['Home', 'Discover', 'Pipeline', 'Browser', 'Mailroom']) await tabs.getByRole('link', { name: label }).waitFor();
 ok('iPhone: bottom tabs, every screen fits without sideways scroll');
+
+// A small Android-size phone: the same screens must still fit, tab bar included.
+const small = await open({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+for (const path of ['/', '/discover', '/pipeline', '/browser', '/mailroom', '/jobs?view=all', '/profile', '/settings', '/insights']) {
+  await small.goto(BASE + path);
+  await small.waitForLoadState('networkidle');
+  await noSideScroll(small, `360px ${path}`);
+  const nav = await small.evaluate(() => document.querySelector('nav[aria-label=Tabs]').getBoundingClientRect().right);
+  assert.ok(nav <= 360, `360px ${path}: tab bar runs off screen (${nav}px)`);
+}
+ok('360px phone: every screen fits, tab bar stays on screen');
 
 assert.deepEqual(errors.filter((e) => !/favicon|Failed to load resource|greenhouse\.io/.test(e)), [], 'browser errors');
 await browser.close();

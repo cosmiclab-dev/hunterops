@@ -2,7 +2,6 @@
 @import '@fontsource/inter/500.css';
 @import '@fontsource/inter/600.css';
 @import '@fontsource/inter/700.css';
-@import '@fontsource/inter/800.css';
 @import '@fontsource/roboto-mono/400.css';
 @import '@fontsource/roboto-mono/500.css';
 
@@ -10,93 +9,118 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Two themes on one set of tokens, after Apple's system colours: grey page,
-   white cards, ink buttons, muted status colours. The <html> element gets .dark from the theme
-   script in layout.tsx (system setting by default, or the Settings toggle). */
+/* Apple Liquid Glass (iOS): system grouped background, white glass cards
+   with a hairline and a soft ambient shadow, one system blue for actions,
+   rounded colourful icons. Dark mode uses iOS's black and elevated greys.
+   The <html> element gets .dark from the theme script in layout.tsx. */
 @layer base {
   :root {
-    /* Apple-like neutrals: system gray backgrounds, near-black ink, one muted
-       blue for focus and links. No purple anywhere. */
-    --background: 240 6% 97%;          /* #F5F5F7 */
-    --foreground: 240 3% 11%;          /* #1D1D1F */
+    --background: 240 24% 96%;         /* #F2F2F7 */
+    --foreground: 0 0% 0%;
     --card: 0 0% 100%;
-    --card-foreground: 240 3% 11%;
+    --card-foreground: 240 6% 11%;     /* #1C1C1E */
     --popover: 0 0% 100%;
-    --popover-foreground: 240 3% 11%;
-    --primary: 240 3% 11%;             /* buttons are ink, not colour */
+    --popover-foreground: 240 6% 11%;
+    --primary: 211 100% 50%;           /* system blue #007AFF */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 93%;
-    --secondary-foreground: 240 3% 11%;
-    --muted: 240 5% 94%;
-    --muted-foreground: 240 2% 44%;    /* #6E6E73 */
-    --accent: 240 5% 92%;
-    --accent-foreground: 240 3% 11%;
-    --destructive: 356 72% 45%;
+    --secondary: 240 6% 94%;
+    --secondary-foreground: 240 6% 11%;
+    --muted: 240 6% 94%;
+    --muted-foreground: 240 2% 43%;    /* #6C6C70 */
+    --accent: 240 6% 94%;
+    --accent-foreground: 240 6% 11%;
+    --destructive: 3 100% 59%;         /* #FF3B30 */
     --destructive-foreground: 0 0% 100%;
-    --success: 140 45% 34%;
-    --warning: 30 80% 38%;
-    --info: 211 70% 42%;
-    --border: 240 6% 89%;              /* #E5E5EA */
+    --success: 135 59% 40%;            /* deeper #34C759 for text contrast */
+    --warning: 28 100% 42%;
+    --info: 199 85% 40%;
+    --border: 240 6% 88%;
     --input: 240 6% 86%;
-    --ring: 211 70% 50%;
-    --radius: 10px;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.02);
-    --sidebar: 240 6% 95%;
-    --glow: 211 70% 50%;
+    --ring: 211 100% 50%;
+    --radius: 12px;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.05);
+    --sidebar: 240 24% 96%;
+    --glow: 211 100% 50%;
+    --glass: 0 0% 100%;
     color-scheme: light;
   }
   .dark {
     --background: 0 0% 0%;
-    --foreground: 0 0% 96%;
-    --card: 240 3% 11%;                /* #1C1C1E */
+    --foreground: 0 0% 100%;
+    --card: 240 6% 11%;                /* #1C1C1E */
     --card-foreground: 0 0% 96%;
-    --popover: 240 3% 11%;
+    --popover: 240 4% 17%;             /* #2C2C2E */
     --popover-foreground: 0 0% 96%;
-    --primary: 0 0% 96%;
-    --primary-foreground: 240 3% 11%;
-    --secondary: 240 3% 17%;
+    --primary: 211 100% 52%;           /* #0A84FF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4% 17%;
     --secondary-foreground: 0 0% 96%;
-    --muted: 240 3% 15%;
+    --muted: 240 4% 17%;
     --muted-foreground: 240 3% 62%;
-    --accent: 240 3% 18%;
+    --accent: 240 4% 20%;
     --accent-foreground: 0 0% 96%;
-    --destructive: 356 75% 60%;
+    --destructive: 3 100% 61%;
     --destructive-foreground: 0 0% 100%;
-    --success: 140 40% 55%;
-    --warning: 35 75% 58%;
-    --info: 211 75% 64%;
-    --border: 240 3% 20%;
-    --input: 240 3% 24%;
-    --ring: 211 75% 64%;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.5);
-    --sidebar: 240 3% 7%;
-    --glow: 211 75% 64%;
+    --success: 135 59% 52%;
+    --warning: 33 100% 55%;
+    --info: 199 90% 60%;
+    --border: 240 4% 22%;
+    --input: 240 4% 26%;
+    --ring: 211 100% 52%;
+    --shadow: 0 0 0 1px rgb(255 255 255 / 0.04);
+    --sidebar: 0 0% 0%;
+    --glow: 211 100% 52%;
+    --glass: 240 6% 11%;
     color-scheme: dark;
   }
   * { @apply border-border; }
   html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; }
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-feature-settings: 'cv11', 'ss01';
+    font-size: 17px;
+    line-height: 1.47;
+    letter-spacing: -0.022em;
+    /* Nothing may widen the page past the screen: a wide child would stretch
+       the phone's layout viewport and push the tab bar off screen. */
+    overflow-x: clip;
   }
-  /* iOS zooms into inputs under 16px; keep form text at 16px on phones. */
-  input, textarea, select { font-size: 16px; }
-  @media (min-width: 768px) { input, textarea, select { font-size: 14px; } }
+  h1, h2, h3 { letter-spacing: -0.015em; }
+  /* iOS zooms into inputs under 16px; keep form text at 17px on phones. */
+  input, textarea, select { font-size: 17px; }
+  @media (min-width: 768px) { input, textarea, select { font-size: 15px; } }
+  button, a { -webkit-touch-callout: none; }
 }
 
 @layer components {
-  .meta { @apply text-xs leading-4 text-muted-foreground; }
-  .label-caps { @apply text-xs font-medium leading-4; }
-  .surface { @apply rounded-xl border bg-card text-card-foreground; box-shadow: var(--shadow); }
-  .page-title { @apply text-[28px] font-semibold leading-9 tracking-[-0.02em]; }
+  .meta { @apply text-xs leading-4 text-muted-foreground; letter-spacing: 0; }
+  .label-caps { @apply text-xs font-medium leading-4; letter-spacing: 0; }
+  /* Glass slab: white card, hairline, soft ambient shadow. */
+  .surface { @apply rounded-[20px] border border-black/[0.06] bg-card text-card-foreground; box-shadow: var(--shadow); }
+  .dark .surface { @apply border-white/[0.06]; }
+  /* iOS large title. */
+  .page-title { @apply text-[30px] font-bold leading-[1.1] sm:text-[34px]; letter-spacing: -0.025em; }
   .section-title { @apply label-caps text-muted-foreground; }
+  /* Option chips: white pill, blue ring when chosen (Apple's configurator). */
   .chip {
-    @apply inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3 text-xs font-medium transition-colors;
+    @apply inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border bg-card px-3.5 text-sm transition-[transform,colors] active:scale-95;
+    letter-spacing: -0.01em;
   }
-  .chip[data-on='true'] { @apply border-foreground bg-foreground text-background; }
-  /* Kept as a hook; the flat shadcn look uses no gradients. */
+  .chip[data-on='true'] { @apply border-primary bg-primary/10 font-medium text-primary; }
   .hero-glow { background: transparent; }
   .kbd { @apply rounded border bg-muted px-1.5 font-mono text-[11px] text-muted-foreground; }
-  .scroll-x { @apply -mx-4 overflow-x-auto px-4; scrollbar-width: none; }
+  /* contain: paint keeps a wide scroller from stretching the phone's layout viewport. */
+  .scroll-x { @apply -mx-4 overflow-x-auto px-4; scrollbar-width: none; contain: paint; }
   .scroll-x::-webkit-scrollbar { display: none; }
+  /* Liquid Glass: translucent material for bars that float over content. */
+  .glass {
+    background: hsl(var(--glass) / 0.72);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+  .glass-float {
+    @apply glass;
+    border: 1px solid hsl(0 0% 100% / 0.5);
+    box-shadow: 0 8px 32px rgb(0 0 0 / 0.12), inset 0 1px 0 hsl(0 0% 100% / 0.6);
+  }
+  .dark .glass-float { border-color: hsl(0 0% 100% / 0.1); box-shadow: 0 8px 32px rgb(0 0 0 / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.08); }
 }

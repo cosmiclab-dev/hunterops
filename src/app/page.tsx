@@ -211,13 +211,13 @@ export default async function Dashboard() {
       <Section title="Shortcuts">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
-            { href: '/mailroom?tab=linkedin', icon: Handshake, title: 'Write outreach', sub: 'LinkedIn and referral notes' },
-            { href: '/profile?tab=roast', icon: Sparkles, title: 'Roast my CV', sub: 'Turn duties into results' },
-            { href: '/insights', icon: Lightbulb, title: 'Insights', sub: 'Patterns, titles, skills' },
-            { href: '/mailroom?tab=gap', icon: Target, title: 'Gap answers', sub: 'For your career break' },
+            { href: '/mailroom?tab=linkedin', icon: Handshake, title: 'Write outreach', sub: 'LinkedIn and referral notes', tone: 'primary' as const },
+            { href: '/profile?tab=roast', icon: Sparkles, title: 'Roast my CV', sub: 'Turn duties into results', tone: 'warning' as const },
+            { href: '/insights', icon: Lightbulb, title: 'Insights', sub: 'Patterns, titles, skills', tone: 'success' as const },
+            { href: '/mailroom?tab=gap', icon: Target, title: 'Gap answers', sub: 'For your career break', tone: 'info' as const },
           ].map((a) => (
-            <Link key={a.href} href={a.href} className="surface flex flex-col gap-3 p-4 transition-colors hover:bg-accent/60">
-              <IconChip icon={a.icon} />
+            <Link key={a.href} href={a.href} className="surface flex flex-col gap-3 p-4 transition-transform active:scale-[0.98]">
+              <IconChip icon={a.icon} tone={a.tone} />
               <div>
                 <p className="font-semibold leading-5">{a.title}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{a.sub}</p>

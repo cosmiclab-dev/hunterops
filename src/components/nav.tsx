@@ -25,10 +25,10 @@ const MORE: Item[] = [
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-2">
-      <span className="grid h-7 w-7 place-items-center rounded-md bg-foreground text-background">
+      <span className="grid h-7 w-7 place-items-center rounded-[8px] bg-foreground text-background">
         <Radar className="h-4 w-4" strokeWidth={2.5} />
       </span>
-      {!compact && <span className="text-[15px] font-semibold tracking-tight">HunterOps</span>}
+      {!compact && <span className="text-[17px] font-semibold tracking-[-0.02em]">HunterOps</span>}
     </span>
   );
 }
@@ -40,8 +40,8 @@ function SideLink({ item, pathname }: { item: Item; pathname: string }) {
       href={item.href}
       aria-current={on ? 'page' : undefined}
       className={cn(
-        'flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors',
-        on ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent/60 hover:text-foreground',
+        'flex h-9 items-center gap-3 rounded-[10px] px-3 text-[15px] transition-colors',
+        on ? 'bg-card font-medium text-primary' : 'text-foreground/80 hover:bg-card/60 hover:text-foreground',
       )}
     >
       <item.icon className="h-4 w-4" />
@@ -83,32 +83,32 @@ export function Nav() {
         </div>
       </aside>
 
-      <header className="sticky top-0 z-40 border-b bg-background/90 pt-[env(safe-area-inset-top)] backdrop-blur lg:hidden">
-        <div className="flex h-14 items-center gap-2 px-4">
+      <header className="glass sticky top-0 z-40 border-b border-border/60 pt-[env(safe-area-inset-top)] lg:hidden">
+        <div className="flex h-12 items-center gap-2 px-4">
           <Link href="/" aria-label="HunterOps home"><Logo /></Link>
-          <div className="ml-auto flex items-center gap-1">
-            <ThemeButton />
+          <div className="ml-auto flex items-center">
             {MORE.map((i) => (
               <Link
                 key={i.href}
                 href={i.href}
                 aria-label={i.label}
-                className={cn('inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors', i.match(pathname) ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')}
+                className={cn('inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors', i.match(pathname) ? 'text-primary' : 'text-foreground/70 hover:text-foreground')}
               >
-                <i.icon className="h-4 w-4" />
+                <i.icon className="h-[19px] w-[19px]" />
               </Link>
             ))}
           </div>
         </div>
       </header>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Tabs">
-        <div className="grid grid-cols-5">
+      {/* Liquid Glass tab bar: a floating capsule above the home indicator. */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),10px)] lg:hidden" aria-label="Tabs">
+        <div className="glass-float mx-auto grid max-w-md grid-cols-5 rounded-full p-1">
           {MAIN.map((i) => {
             const on = i.match(pathname);
             return (
-              <Link key={i.href} href={i.href} className={cn('flex h-16 flex-col items-center justify-center gap-1', on ? 'text-foreground' : 'text-muted-foreground')} aria-current={on ? 'page' : undefined}>
-                <i.icon className="h-5 w-5" strokeWidth={on ? 2.4 : 2} />
-                <span className="text-[10px] font-medium">{i.label}</span>
+              <Link key={i.href} href={i.href} className={cn('flex h-[52px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-full transition-colors', on ? 'bg-foreground/[0.07] text-primary' : 'text-foreground/70')} aria-current={on ? 'page' : undefined}>
+                <i.icon className="h-[21px] w-[21px]" strokeWidth={on ? 2.3 : 1.9} />
+                <span className="max-w-full truncate px-0.5 text-[10px] font-medium leading-3 tracking-normal">{i.label}</span>
               </Link>
             );
           })}
@@ -125,8 +125,8 @@ export function Frame({ children }: { children: React.ReactNode }) {
   if (pathname === '/login') return <main>{children}</main>;
   const wide = /^\/(browser|pipeline)/.test(pathname);
   return (
-    <div className="lg:pl-60">
-      <main className={cn('mx-auto w-full px-4 pb-28 pt-5 md:px-6 lg:px-8 lg:pb-12 lg:pt-8', wide ? 'max-w-none' : 'max-w-6xl')}>{children}</main>
+    <div className="min-w-0 lg:pl-60">
+      <main className={cn('mx-auto w-full min-w-0 px-4 pb-32 pt-6 md:px-6 lg:px-10 lg:pb-14 lg:pt-10', wide ? 'max-w-none' : 'max-w-6xl')}>{children}</main>
     </div>
   );
 }
