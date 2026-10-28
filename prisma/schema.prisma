@@ -107,6 +107,8 @@ model Job {
   contacts       Contact[]
   outreach       Outreach[]
   artifact       Artifact?
+  reports        Report[]
+  stories        Story[]
 
   @@index([status, firstSeenAt(sort: Desc)])
   @@index([grillScore(sort: Desc)])
@@ -204,6 +206,46 @@ model Artifact {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("artifacts")
+}
+
+// Career-Ops style reports: the A-H evaluation, interview prep, negotiation,
+// company research and the other modes. One row per run; the newest wins.
+model Report {
+  id        String   @id @default(uuid()) @db.Uuid
+  jobId     String?  @map("job_id") @db.Uuid
+  job       Job?     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  mode      String
+  title     String
+  score     Float?
+  data      Json
+  model     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([jobId, mode, createdAt(sort: Desc)])
+  @@index([mode, createdAt(sort: Desc)])
+  @@map("reports")
+}
+
+// Interview story bank (STAR + Reflection), grown from evaluations and edited by hand.
+model Story {
+  id         String   @id @default(uuid()) @db.Uuid
+  jobId      String?  @map("job_id") @db.Uuid
+  job        Job?     @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  theme      String   @default("")
+  title      String
+  situation  String   @default("")
+  task       String   @default("")
+  action     String   @default("")
+  result     String   @default("")
+  reflection String   @default("")
+  bestFor    String   @default("") @map("best_for")
+  source     String   @default("")
+  verified   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([title])
+  @@map("stories")
 }
 
 model ScanRun {
