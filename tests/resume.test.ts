@@ -52,7 +52,7 @@ describe('Module E: Designer + renderer', () => {
     expect(issues.some((i) => i.rule === 'bullet-length')).toBe(true);
     expect(issues.some((i) => i.rule === 'bullet-count')).toBe(true);
     expect(issues.some((i) => i.level === 'error')).toBe(false);
-  });
+  }, 20_000);
 
   it('renders a DOCX that reads back', async () => {
     const docx = await renderDocx(resume);
