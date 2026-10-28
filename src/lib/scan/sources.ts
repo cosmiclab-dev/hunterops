@@ -18,7 +18,10 @@ export type Posting = {
   salary: string | null;
 };
 export type CompanyRow = { id?: string; name: string; ats_type: string; ats_slug: string };
-export type ScanCtx = { searchTerms: string[]; settings: { adzuna_app_id: string | null; adzuna_app_key: string | null } };
+export type ScanCtx = { searchTerms: string[]; settings: { adzuna_app_id: string | null; adzuna_app_key: string | null }; deadline?: number };
+
+// Sources that page through results stop asking once another request could outlast the scan.
+export const outOfTime = (ctx: ScanCtx) => ctx.deadline != null && Date.now() > ctx.deadline - FETCH_TIMEOUT_MS;
 type Json = any;
 
 const UA = 'HunterOps/2.0 (personal job search; +https://github.com/cosmiclab-dev/hunterops)';
@@ -122,6 +125,7 @@ async function ashby(c: CompanyRow): Promise<Posting[]> {
 async function smartrecruiters(c: CompanyRow, ctx: ScanCtx): Promise<Posting[]> {
   const out: Posting[] = [];
   for (const q of ctx.searchTerms.slice(0, 3)) {
+    if (outOfTime(ctx)) break;
     const data = await getJson(`https://api.smartrecruiters.com/v1/companies/${encodeURIComponent(c.ats_slug)}/postings?limit=100&q=${encodeURIComponent(q)}`);
     for (const j of data.content || []) {
       const loc = j.location || {};
@@ -158,7 +162,9 @@ async function workday(c: CompanyRow, ctx: ScanCtx): Promise<Posting[]> {
   const endpoint = `https://${host}/wday/cxs/${tenant}/${site}/jobs`;
   const seen = new Map<string, Posting>();
   for (const q of ctx.searchTerms.slice(0, 3)) {
+    if (outOfTime(ctx)) break;
     for (let offset = 0; offset < 60; offset += 20) {
+      if (outOfTime(ctx)) break;
       const data = await getJson(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -183,6 +189,19 @@ async function workday(c: CompanyRow, ctx: ScanCtx): Promise<Posting[]> {
       if (posts.length < 20) break;
     }
   }
+  // A role open in several cities is listed as "2 Locations"; its detail page names them.
+  const multi = [...seen.values()].filter((p) => /^\d+ locations?$/i.test(p.location || '')).slice(0, 6);
+  await Promise.all(multi.map(async (p) => {
+    if (outOfTime(ctx)) return;
+    try {
+      const d = await getJson(`${endpoint.replace(/\/jobs$/, '')}${p.source_id}`);
+      const info = d.jobPostingInfo || {};
+      const all = [info.location, ...(Array.isArray(info.additionalLocations) ? info.additionalLocations : [])].filter(Boolean);
+      if (all.length) Object.assign(p, { location: all.join('; '), remote: p.remote || /remote/i.test(all.join(' ')) });
+    } catch {
+      // Keep the posting as listed.
+    }
+  }));
   return [...seen.values()];
 }
 
@@ -232,6 +251,7 @@ async function adzuna(ctx: ScanCtx): Promise<Posting[] | { skipped: string }> {
     { what: 'remote recruiter', where: '' },
   ];
   for (const q of queries) {
+    if (outOfTime(ctx)) break;
     const params = new URLSearchParams({
       app_id: id, app_key: key, results_per_page: '50', what: q.what, max_days_old: '7', sort_by: 'date',
     });
@@ -258,6 +278,7 @@ async function adzuna(ctx: ScanCtx): Promise<Posting[] | { skipped: string }> {
 async function remotive(ctx: ScanCtx): Promise<Posting[] | { skipped: string }> {
   const out: Posting[] = [];
   for (const q of ctx.searchTerms.slice(0, 2)) {
+    if (outOfTime(ctx)) break;
     const data = await getJson(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(q)}&limit=100`);
     for (const j of data.jobs || []) {
       out.push({
@@ -296,6 +317,7 @@ async function remoteok(): Promise<Posting[]> {
 async function himalayas(ctx: ScanCtx): Promise<Posting[] | { skipped: string }> {
   const out: Posting[] = [];
   for (const q of ctx.searchTerms.slice(0, 2)) {
+    if (outOfTime(ctx)) break;
     const data = await getJson(`https://himalayas.app/jobs/api/search?q=${encodeURIComponent(q)}&limit=50`);
     for (const j of data.jobs || []) {
       const restrictions = (j.locationRestrictions || []).map((r: Json) => (typeof r === 'string' ? r : r?.name)).filter(Boolean);

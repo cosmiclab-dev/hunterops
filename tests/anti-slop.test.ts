@@ -38,4 +38,17 @@ describe('Module A: Anti-Slop', () => {
   it('puts the list in the prompt instruction', () => {
     for (const p of BANNED_PHRASES) expect(antiSlopInstruction()).toContain(`"${p}"`);
   });
+
+  it('swaps keep the grammar and leave company names alone', () => {
+    const fix = (t: string) => applySafeFixes(t).text;
+    expect(fix('We delve into data.')).toBe('We look at data.');
+    expect(fix('This is a testament to grit.')).toBe('This shows grit.');
+    expect(fix('I want to foster trust.')).toBe('I want to build trust.');
+    expect(fix('I navigated a merger.')).toBe('I handled a merger.');
+    expect(fix('The hiring landscape is tough.')).toBe('The hiring market is tough.');
+    expect(fix('I joined BrightView Landscape Services.')).toBe('I joined BrightView Landscape Services.');
+    expect(scanSlop('Hi Asha at Navigate Health,').clean).toBe(true);
+    expect(scanSlop('Navigating change is hard.').clean).toBe(false);
+  });
 });
+

@@ -8,6 +8,7 @@ import { bingSearch, duckSearch } from '@/lib/websearch';
 import { ATS_FETCHERS, BOARD_FETCHERS, type Posting, type ScanCtx } from '@/lib/scan/sources';
 import { SEED_COMPANIES } from '@/lib/scan/seed-companies';
 import { loadJobPage } from '@/lib/job-page';
+import { hostedReadPage } from '@/lib/crawl4ai';
 import { hasMx } from '@/lib/email-guess';
 
 const ctx: ScanCtx = { searchTerms: ['recruiter', 'talent acquisition'], settings: { adzuna_app_id: null, adzuna_app_key: null } };
@@ -90,6 +91,24 @@ describe('in-app browser', () => {
     const page = await loadJobPage(greenhouseJob!.url);
     report(`| Browser | ${page.title} at ${page.company}: ${page.description.length} chars, ${page.fields.length} form fields |`);
     expect(page.description.length).toBeGreaterThan(300);
+  }, 60_000);
+});
+
+describe('built-in page reader', () => {
+  it('renders a JavaScript-only job posting through the hosted reader', async () => {
+    // An Ashby posting page is built entirely by JavaScript; a plain fetch gets an empty shell.
+    let url = '';
+    for (const [, atsType, slug] of SEED_COMPANIES) {
+      if (atsType !== 'ashby') continue;
+      const board = await fetch(`https://api.ashbyhq.com/posting-api/job-board/${slug}`).then((r) => r.json()).catch(() => null) as { jobs?: { jobUrl: string }[] } | null;
+      url = board?.jobs?.[0]?.jobUrl || '';
+      if (url) break;
+    }
+    expect(url, 'no starter Ashby board has an open posting').not.toBe('');
+    const page = await hostedReadPage(url);
+    report(`| Page reader | ${page.title || '(no title)'}: ${page.markdown.length} chars from ${url} |`);
+    if (page.markdown.length <= 400) report(`| Page reader text | ${page.markdown.replace(/\s+/g, ' ').slice(0, 300)} |`);
+    expect(page.markdown.length).toBeGreaterThan(400);
   }, 60_000);
 });
 

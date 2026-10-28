@@ -24,7 +24,9 @@ function Actions({ actions, feed }: { actions: ModeAction[]; feed: string }) {
   async function addTitles() {
     setErr('');
     try {
-      const current = feed.split(',').map((s) => s.trim()).filter(Boolean);
+      // Read the saved list again, so titles added earlier on this page are kept.
+      const saved = await api<{ settings: Record<string, { value: string | null }> }>('/api/settings').then((r) => r.settings.feed_keywords?.value ?? feed).catch(() => feed);
+      const current = saved.split(',').map((s) => s.trim()).filter(Boolean);
       const next = [...new Set([...current, ...picked.map((t) => t.toLowerCase())])];
       await api('/api/settings', { method: 'PUT', json: { values: { feed_keywords: next.join(', ') } } });
       setMsg(`Added ${picked.length} titles to your job feed. The next scan uses them.`);

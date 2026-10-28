@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 const Patch = z.object({
   subject: z.string().min(1).max(200).optional(),
-  body: z.string().min(1).max(5000).optional(),
+  body: z.string().min(1).max(6000).optional(),
   toEmail: z.string().max(200).regex(EMAIL_RE, 'Enter a valid email address').optional(),
 });
 
@@ -20,6 +20,7 @@ export const PATCH = route(async (req: Request, { params }: Ctx) => {
   const email = await prisma.email.findUnique({ where: { id: params.id } });
   if (!email) throw new HttpError(404, 'Email not found.');
   if (email.status === 'SENT') throw new HttpError(409, 'This email was already sent.');
+  if (email.status === 'APPROVED') throw new HttpError(409, 'This email is being sent, or may already have gone out. Check your Gmail Sent folder.');
   const next = { ...email, ...patch };
   const updated = await prisma.email.update({
     where: { id: params.id },
@@ -32,6 +33,8 @@ export const DELETE = route(async (_req: Request, { params }: Ctx) => {
   const email = await prisma.email.findUnique({ where: { id: params.id } });
   if (!email) throw new HttpError(404, 'Email not found.');
   if (email.status === 'SENT') throw new HttpError(409, 'Sent emails stay in the log.');
+  // A send in progress finishes first; an unconfirmed one (older) can be cleared.
+  if (email.status === 'APPROVED' && email.approvedAt && Date.now() - email.approvedAt.getTime() < 90_000) throw new HttpError(409, 'This email is being sent. Try again in a minute.');
   await prisma.email.delete({ where: { id: params.id } });
   return ok({ ok: true });
 });

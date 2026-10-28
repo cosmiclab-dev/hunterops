@@ -29,7 +29,8 @@ function LoginForm() {
   }
 
   return (
-    <form onSubmit={submit} className="surface hero-glow mx-auto mt-16 flex max-w-sm flex-col gap-5 p-6">
+    <div className="flex min-h-[70dvh] items-center px-4">
+    <form onSubmit={submit} className="surface hero-glow mx-auto flex w-full max-w-sm flex-col gap-5 p-6">
       <div className="flex flex-col gap-2">
         <Logo />
         <p className="text-sm text-muted-foreground">Recruiter command center. Sign in to continue.</p>
@@ -41,6 +42,7 @@ function LoginForm() {
       <Button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</Button>
       {err && <p className="text-sm text-destructive" role="alert">{err}</p>}
     </form>
+    </div>
   );
 }
 

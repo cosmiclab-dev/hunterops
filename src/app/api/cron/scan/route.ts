@@ -4,7 +4,8 @@ import { loadSettings } from '@/lib/settings';
 import { runScan } from '@/lib/scan/scanner';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// 45 s of fetching, then saving and scoring.
+export const maxDuration = 120;
 
 // Vercel Cron calls this with "Authorization: Bearer $CRON_SECRET".
 export const GET = route(async (req: Request) => {

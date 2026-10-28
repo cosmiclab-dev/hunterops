@@ -31,6 +31,8 @@ export const SETTINGS: Record<string, Def> = {
   },
   feed_exclude: { label: 'Exclude words', fallback: 'intern, internship, trainee, apprentice' },
   feed_locations: { label: 'Locations', fallback: 'bengaluru,remote_india,remote_global' },
+  auto_apply_count: { label: 'Applications the AI prepares each morning', fallback: '3' },
+  auto_apply_min_score: { label: 'Lowest Grill Score it prepares for', fallback: '75' },
   banned_words_extra: { label: 'Extra banned words' },
   writing_tone: { label: 'Writing tone', fallback: 'warm' },
   email_length: { label: 'Email length', fallback: 'standard' },
@@ -41,6 +43,7 @@ export const SETTINGS: Record<string, Def> = {
   crawl4ai_token: { label: 'Page reader token', secret: true, env: 'CRAWL4AI_TOKEN' },
   boards_scanned_at: { label: 'Boards last scanned', internal: true },
   seed_version: { label: 'Starter boards version', internal: true },
+  login_lock: { label: 'Wrong passwords in a row', internal: true },
 };
 
 export type SettingKey = keyof typeof SETTINGS;

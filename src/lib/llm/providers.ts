@@ -86,7 +86,7 @@ export const PROVIDERS = {
 
 export type ProviderId = keyof typeof PROVIDERS;
 
-export const isProviderId = (v: unknown): v is ProviderId => typeof v === 'string' && v in PROVIDERS;
+export const isProviderId = (v: unknown): v is ProviderId => typeof v === 'string' && Object.hasOwn(PROVIDERS, v);
 
 // Letters, digits and . - _ / : only (covers "openai/gpt-x", "models/gemini-x", "llama3:8b").
 export const MODEL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._\/:-]{0,99}$/;

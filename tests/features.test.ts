@@ -38,6 +38,18 @@ describe('Auto-fill', () => {
     expect(got.why_company.source).toBe('ai');
   });
 
+  it('leaves yes/no, option and only-you questions out of the profile mapping', () => {
+    const f = (label: string, extra: Record<string, unknown> = {}) => mapField({ key: 'q', label, type: 'text', required: false, ...extra } as any, profile);
+    expect(f('Will you require visa sponsorship to work in this location?').source).toBe('ai');
+    expect(f('Are you comfortable with a phone screen?').source).toBe('ai');
+    expect(f('How did you hear about us? (e.g. company website)').source).toBe('you');
+    expect(f('Name of your referrer').source).toBe('you');
+    expect(f('Do you have a degree in CS?').source).toBe('ai');
+    expect(f('Expected salary', { type: 'select', options: ['Under 20 LPA', '20-30 LPA'] }).source).toBe('ai');
+    expect(f('When can you join?').value).toBe('Immediate (0 days)');
+    expect(f('Phone number').value).toBe(profile.phone);
+  });
+
   it('asks the model only for open questions, and passes Anti-Slop', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(reply({ answers: { why_company: 'Your GCC is scaling tech hiring, which is the work I led at Capgemini.' } }));
     const sheet = await buildAnswerSheet(cfg, { fields: [], profile, company: 'Acme', role: 'Senior Recruiter', jd: 'JD' });
@@ -107,7 +119,7 @@ describe('CV reading without AI', () => {
 
 describe('Module A guard', () => {
   it('scanForSlop returns findings, with custom words from Settings', () => {
-    expect(scanForSlop('We delve into the landscape.')).toEqual({ hasSlop: true, findings: ['delve', 'landscape'] });
+    expect(scanForSlop('We delve into the landscape.')).toEqual({ hasSlop: true, findings: ['delve into', 'landscape'] });
     const extra = parseExtraBanned('Synergy, leverage\npassionate, x');
     expect(extra).toEqual(['synergy', 'leverage', 'passionate']);
     expect(scanSlop('Passionate about synergy.', extra).hits.map((h) => h.phrase)).toEqual(['passionate', 'synergy']);

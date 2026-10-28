@@ -9,15 +9,23 @@ export async function regrill(where: Prisma.JobWhereInput = { status: { not: 'DI
   const profile = await loadProfile();
   if (!profile || profileIsEmpty(profile)) throw new HttpError(400, 'Set up your profile first: upload your CV on the Home page.');
   const gp = toGrillProfile(profile);
-  const jobs = await prisma.job.findMany({ where, select: { id: true, title: true, location: true, description: true, workMode: true, salary: true } });
-  const results = jobs.map((j) => ({ id: j.id, g: grill(gp, j) }));
-  // One UPDATE per 500 jobs, so a save with a big board still answers in a second or two.
-  for (let i = 0; i < results.length; i += 500) {
-    const rows = results.slice(i, i + 500).map(({ id, g }) => ({ id, score: g.score, breakdown: g }));
+  // Pages of 400 jobs keep memory flat on a board with months of scans.
+  const results: { id: string; g: ReturnType<typeof grill> }[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const jobs = await prisma.job.findMany({
+      where, orderBy: { id: 'asc' }, take: 400, ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      select: { id: true, title: true, location: true, description: true, workMode: true, salary: true },
+    });
+    if (!jobs.length) break;
+    const rows = jobs.map((j) => ({ id: j.id, g: grill(gp, j) }));
+    results.push(...rows);
     await prisma.$executeRaw`
       UPDATE jobs AS j SET grill_score = x.score, grill_breakdown = x.breakdown, grilled_at = now()
-      FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS x(id uuid, score int, breakdown jsonb)
+      FROM jsonb_to_recordset(${JSON.stringify(rows.map(({ id, g }) => ({ id, score: g.score, breakdown: g })))}::jsonb) AS x(id uuid, score int, breakdown jsonb)
       WHERE j.id = x.id`;
+    cursor = jobs[jobs.length - 1].id;
+    if (jobs.length < 400) break;
   }
   return results;
 }

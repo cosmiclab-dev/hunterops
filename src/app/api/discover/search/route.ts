@@ -59,7 +59,10 @@ export const POST = route(async (req: Request) => {
         continue;
       }
       for (const x of r.value) {
-        const key = x.url.split('?')[0];
+        // Greenhouse links carry the job in the query (gh_jid, token), so keep those.
+        const u = new URL(x.url);
+        const id = ['gh_jid', 'token', 'for'].map((k) => u.searchParams.get(k)).filter(Boolean).join(':');
+        const key = `${u.origin}${u.pathname}${id ? `?${id}` : ''}`;
         if (seen.has(key)) continue;
         seen.add(key);
         const { role, company } = splitResultTitle(x.title, x.url);

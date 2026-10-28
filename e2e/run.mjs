@@ -211,7 +211,7 @@ await step('draft a recruiter email (AIDA); Anti-Slop removes "delve"', async ()
 
 await step('nothing is sent without approval or with a stale draft', async () => {
   assert.equal((await call('POST', `/api/emails/${email.id}/send`, {})).status, 400);
-  assert.equal((await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: 'old text' })).status, 409);
+  assert.equal((await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: 'old text', toEmail: email.toEmail })).status, 409);
   assert.equal(fs.readFileSync(MAIL, 'utf8').trim(), '');
 });
 
@@ -219,7 +219,7 @@ await step('edit the draft, then approve and send it', async () => {
   const edited = await call('PATCH', `/api/emails/${email.id}`, { body: `${email.body}\n\nP.S. Happy to share references.` });
   assert.equal(edited.status, 200);
   email = edited.data.email;
-  const sent = await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: email.body });
+  const sent = await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: email.body, toEmail: email.toEmail });
   assert.equal(sent.status, 200, JSON.stringify(sent.data));
   assert.equal(sent.data.email.status, 'SENT');
   const mails = fs.readFileSync(MAIL, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
@@ -230,7 +230,7 @@ await step('edit the draft, then approve and send it', async () => {
 });
 
 await step('a sent email cannot be sent twice, edited or deleted', async () => {
-  assert.equal((await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: email.body })).status, 409);
+  assert.equal((await call('POST', `/api/emails/${email.id}/send`, { approve: true, subject: email.subject, body: email.body, toEmail: email.toEmail })).status, 409);
   assert.equal((await call('PATCH', `/api/emails/${email.id}`, { body: 'x' })).status, 409);
   assert.equal((await call('DELETE', `/api/emails/${email.id}`)).status, 409);
 });
@@ -238,7 +238,7 @@ await step('a sent email cannot be sent twice, edited or deleted', async () => {
 await step('daily cap is enforced', async () => {
   for (let i = 0; i < 2; i++) {
     const d = (await call('POST', '/api/emails', { jobId: ids.us, toEmail: `r${i}@beta.example`, kind: 'follow_up' })).data.email;
-    const s = await call('POST', `/api/emails/${d.id}/send`, { approve: true, subject: d.subject, body: d.body });
+    const s = await call('POST', `/api/emails/${d.id}/send`, { approve: true, subject: d.subject, body: d.body, toEmail: d.toEmail });
     if (i === 0) assert.equal(s.status, 200);
     else {
       assert.equal(s.status, 429);
@@ -593,6 +593,49 @@ await step('Pipeline columns: Scouted, Grilled 75+, Applied, Rejected', async ()
   assert.equal((await call('PATCH', `/api/jobs/${ghJob.id}`, { status: 'SAVED' })).status, 200);
 });
 
+await step('Apply with AI: prepared, approval pending on the Pipeline, approved, submitted by the person, Applied', async () => {
+  assert.equal((await call('GET', `/api/applications/${ghJob.id}`)).data.application, null);
+  const prep = await call('POST', '/api/applications', { jobId: ghJob.id });
+  assert.equal(prep.status, 201, JSON.stringify(prep.data));
+  assert.equal(prep.data.application.status, 'PENDING');
+  const got = (await call('GET', `/api/applications/${ghJob.id}`)).data.application;
+  const by = Object.fromEntries(got.answers.map((a) => [a.key, a]));
+  assert.equal(by.first_name.value, 'Divya');
+  assert.ok(got.resume?.id, 'tailored resume missing');
+  assert.ok(got.coverLetter && got.coverLetter.length > 50, 'cover letter missing');
+  assert.ok(got.embedUrl, 'Greenhouse form link missing');
+  // The Pipeline and Home show it waiting for approval.
+  assert.match(await (await call('GET', '/pipeline', undefined, { raw: true })).text(), /Approval pending/);
+  assert.match(await (await call('GET', '/', undefined, { raw: true })).text(), /approval pending/i);
+  // Nothing moves without the person: no submit before approval, no approval without confirming.
+  assert.equal((await call('POST', `/api/applications/${ghJob.id}/submitted`)).status, 409);
+  assert.equal((await call('POST', `/api/applications/${ghJob.id}/approve`, {})).status, 400);
+  // An edit during review is kept and marked as theirs.
+  const edited = await call('PATCH', `/api/applications/${ghJob.id}`, { answers: [{ key: 'question_3', value: 'I hire for GCCs.' }] });
+  assert.equal(edited.status, 200, JSON.stringify(edited.data));
+  assert.equal(edited.data.application.answers.find((a) => a.key === 'question_3').source, 'you');
+  const ok1 = await call('POST', `/api/applications/${ghJob.id}/approve`, { approve: true });
+  assert.equal(ok1.status, 200, JSON.stringify(ok1.data));
+  assert.equal(ok1.data.application.status, 'APPROVED');
+  assert.equal((await call('POST', `/api/applications/${ghJob.id}/approve`, { approve: true })).status, 409);
+  const done = await call('POST', `/api/applications/${ghJob.id}/submitted`);
+  assert.equal(done.status, 200, JSON.stringify(done.data));
+  const job = (await call('GET', `/api/jobs/${ghJob.id}`)).data.job;
+  assert.equal(job.status, 'APPLIED');
+  assert.ok(job.appliedAt);
+  assert.equal((await call('POST', '/api/applications', { jobId: ghJob.id })).status, 409);
+  assert.equal((await call('GET', `/apply/${ghJob.id}`, undefined, { raw: true })).status, 200);
+  // The morning run needs CRON_SECRET; the Pipeline button prepares top matches (or says there are none).
+  assert.equal((await fetch(BASE + '/api/cron/prepare')).status, 401);
+  assert.equal((await call('PUT', '/api/settings', { values: { auto_apply_count: '9' } })).status, 400);
+  assert.equal((await call('PUT', '/api/settings', { values: { auto_apply_count: '1', auto_apply_min_score: '0' } })).status, 200);
+  const auto = await call('POST', '/api/applications/auto');
+  assert.equal(auto.status, 200, JSON.stringify(auto.data));
+  assert.equal(auto.data.off, false);
+  assert.ok(auto.data.prepared.length + auto.data.failed.length <= 1);
+  assert.equal((await call('PUT', '/api/settings', { values: { auto_apply_count: null, auto_apply_min_score: null } })).status, 200);
+});
+
 await step('scan summary says how many matches are already on the board', async () => {
   const r = await call('POST', '/api/scan', { force: true });
   assert.equal(r.status, 200, JSON.stringify(r.data));
@@ -609,13 +652,18 @@ await step('every app page renders for a signed-in user', async () => {
   assert.match(old.headers.get('location'), /\/mailroom/);
 });
 
-await step('Crawl4AI page reader: JS-only pages read through it, blocked pages stay blocked', async () => {
+await step('Page readers: JS-only pages read through the built-in reader or Crawl4AI, blocked pages stay blocked', async () => {
   const WEB = 'http://127.0.0.1:4020';
-  // Off by default: a JavaScript-only page reads as almost empty.
+  // No Crawl4AI server: the built-in hosted reader renders the JavaScript-only page.
   const before = await call('POST', '/api/browser/open', { url: `${WEB}/page/spa` });
   assert.equal(before.status, 200, JSON.stringify(before.data));
-  assert.ok(!/Boolean search/.test(before.data.page.description));
-  assert.equal(before.data.page.via, 'direct');
+  assert.equal(before.data.page.via, 'reader');
+  assert.equal(before.data.page.title, 'Talent Partner, India');
+  assert.match(before.data.page.description, /Boolean search/);
+  const st0 = await call('POST', '/api/selftest');
+  const r0 = st0.data.checks.find((c) => c.id === 'reader');
+  assert.equal(r0.ok, true, r0.detail);
+  assert.match(r0.detail, /Built-in reader/);
   assert.equal((await call('PUT', '/api/settings', { values: { crawl4ai_url: WEB, crawl4ai_token: 'hunter:c4-e2e' } })).status, 200);
   const t = await call('POST', '/api/settings/test-reader', {});
   assert.equal(t.status, 200, JSON.stringify(t.data));

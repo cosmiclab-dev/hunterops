@@ -1,3 +1,4 @@
+import { hasAppSecret } from '@/lib/crypto';
 import { prisma } from '@/lib/db';
 import { ok, route } from '@/lib/http';
 import { loadJobPage } from '@/lib/job-page';
@@ -9,10 +10,11 @@ import { ATS_FETCHERS, BOARD_FETCHERS, type CompanyRow, type Posting, type ScanC
 import { SEED_COMPANIES } from '@/lib/scan/seed-companies';
 import { loadSettings } from '@/lib/settings';
 import { bingSearch, duckSearch, searchConfig, SEARCH_PROVIDERS, webSearch } from '@/lib/websearch';
-import { crawlerFrom, testCrawler } from '@/lib/crawl4ai';
+import { crawlerFrom, testCrawler, testHostedReader } from '@/lib/crawl4ai';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// The checks run in parallel (30 s each at most), then the browser check (30 s).
+export const maxDuration = 120;
 
 type Check = { id: string; group: string; label: string; ok: boolean; skipped?: boolean; ms: number; detail: string };
 class Skip extends Error {}
@@ -78,7 +80,7 @@ export const POST = route(async () => {
     }),
     run('signin', 'Your data', 'Sign-in protection', async () => {
       if (!process.env.APP_PASSWORD) throw new Error('No APP_PASSWORD is set, so anyone with the link can open this app and your saved keys. Add APP_PASSWORD in Vercel, Settings, Environment Variables, then redeploy.');
-      if (!process.env.APP_SECRET) throw new Error('APP_SECRET is not set. Saved keys are not encrypted with a separate secret. Add APP_SECRET in Vercel.');
+      if (!hasAppSecret()) throw new Error('APP_SECRET is missing or shorter than 32 characters, so API keys cannot be saved. Add a long random APP_SECRET in Vercel, then redeploy.');
       return 'Password sign-in is on and saved keys are encrypted.';
     }),
     run('profile', 'Your data', 'Profile', async () => {
@@ -90,8 +92,12 @@ export const POST = route(async () => {
       const last = await prisma.scanRun.findFirst({ orderBy: { startedAt: 'desc' } });
       if (!last) throw new Skip('No scan has run yet. Press Scan on the Jobs page.');
       const errs = Array.isArray(last.errors) ? last.errors.length : 0;
-      if (!last.finishedAt) throw new Error(`Started ${last.startedAt.toISOString()} and never finished.`);
-      return `${last.startedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC: ${last.fetched ?? 0} read, ${last.inserted ?? 0} new, ${errs} sources failed.`;
+      const at = last.startedAt.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' });
+      if (!last.finishedAt) {
+        if (Date.now() - last.startedAt.getTime() < 5 * 60_000) return `A scan started at ${at} is running now.`;
+        throw new Error(`The scan started ${at} never finished (it ran out of time). The next scan picks up where it stopped.`);
+      }
+      return `${at}: ${last.fetched ?? 0} read, ${last.inserted ?? 0} new, ${errs} sources failed.`;
     }),
     run('ai', 'AI', 'AI model', async () => {
       const cfg = llmConfig(settings);
@@ -101,10 +107,9 @@ export const POST = route(async () => {
       ], { maxTokens: 1024, timeoutMs: 28_000 });
       return `${PROVIDERS[cfg.provider].label}, ${out.model}: "${out.content.trim().slice(0, 30)}"`;
     }),
-    run('reader', 'Company career sites', 'Page reader (Crawl4AI)', async () => {
+    run('reader', 'Company career sites', crawlerFrom(settings) ? 'Page reader (your Crawl4AI)' : 'Page reader (built-in)', async () => {
       const crawler = crawlerFrom(settings);
-      if (!crawler) throw new Skip('Not set up. Optional: add your Crawl4AI server in Settings, Job search.');
-      return testCrawler(crawler);
+      return crawler ? testCrawler(crawler) : testHostedReader();
     }),
     ...(() => {
       const cfg = searchConfig(settings);

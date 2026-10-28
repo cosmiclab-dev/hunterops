@@ -22,6 +22,17 @@ enum JobStatus {
   DISMISSED
 }
 
+// An application the AI prepared: PENDING waits for the person's approval,
+// APPROVED means they cleared it and are filling the real form, SUBMITTED
+// means they pressed Submit on the company site.
+enum ApplicationStatus {
+  PREPARING
+  PENDING
+  APPROVED
+  SUBMITTED
+  FAILED
+}
+
 enum WorkMode {
   REMOTE
   HYBRID
@@ -107,6 +118,7 @@ model Job {
   contacts       Contact[]
   outreach       Outreach[]
   artifact       Artifact?
+  application    Application?
   reports        Report[]
   stories        Story[]
 
@@ -206,6 +218,30 @@ model Artifact {
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("artifacts")
+}
+
+model Application {
+  id          String            @id @default(uuid()) @db.Uuid
+  jobId       String            @unique @map("job_id") @db.Uuid
+  job         Job               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status      ApplicationStatus @default(PREPARING)
+  // The answer sheet: [{ key, label, type, required, value, source, note, options }]
+  answers     Json?
+  resumeId    String?           @map("resume_id") @db.Uuid
+  coverLetter String?           @map("cover_letter")
+  applyUrl    String?           @map("apply_url")
+  embedUrl    String?           @map("embed_url")
+  notes       Json              @default("[]")
+  error       String?
+  auto        Boolean           @default(false)
+  preparedAt  DateTime?         @map("prepared_at")
+  approvedAt  DateTime?         @map("approved_at")
+  submittedAt DateTime?         @map("submitted_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  @@index([status])
+  @@map("applications")
 }
 
 // Career-Ops style reports: the A-H evaluation, interview prep, negotiation,

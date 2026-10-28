@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ExternalLink, Globe, Send } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Globe, Send, Wand2 } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -43,15 +43,18 @@ export default async function JobPage({ params }: { params: { id: string } }) {
           <h1 className="page-title mt-1">{job.title}</h1>
           <p className="meta mt-2">{[job.location, job.workMode !== 'UNKNOWN' ? job.workMode.toLowerCase() : null, job.salary, job.source, timeAgo(job.postedAt || job.firstSeenAt)].filter(Boolean).join(' · ')}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild>
-            <Link href={`/browser/${job.id}`}><Globe /> Open in Browser</Link>
+        <div className="grid grid-cols-3 gap-2 md:flex md:flex-wrap">
+          <Button asChild data-testid="apply-with-ai" className="col-span-3">
+            <Link href={`/apply/${job.id}`}><Wand2 /> Apply with AI</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href={`/browser/${job.id}`}><Globe /> Browser</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href={`/mailroom?tab=linkedin&jobId=${job.id}`}><Send /> Outreach</Link>
           </Button>
-          <Button asChild variant="ghost" size="icon" aria-label="Original posting">
-            <a href={job.url} target="_blank" rel="noopener noreferrer"><ExternalLink /></a>
+          <Button asChild variant="outline">
+            <a href={job.url} target="_blank" rel="noopener noreferrer" aria-label="Original posting"><ExternalLink /> Posting</a>
           </Button>
         </div>
       </header>
@@ -77,7 +80,7 @@ export default async function JobPage({ params }: { params: { id: string } }) {
               <ModesPanel scope="job" jobId={job.id} initial={modeReports} />
             </TabsContent>
             <TabsContent value="jd">
-              <div className="surface whitespace-pre-wrap p-5 text-sm leading-6">{job.description || 'No description yet. Open it in the Browser and HunterOps reads the full posting.'}</div>
+              <div className="surface whitespace-pre-wrap p-5 text-sm leading-6 [overflow-wrap:anywhere]">{job.description || 'No description yet. Open it in the Browser and HunterOps reads the full posting.'}</div>
             </TabsContent>
             <TabsContent value="resume">
               <ResumePanel jobId={job.id} saved={job.resumes.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }))} />

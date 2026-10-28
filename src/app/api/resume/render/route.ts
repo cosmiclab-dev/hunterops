@@ -10,7 +10,7 @@ export const maxDuration = 30;
 const Body = z.object({
   resumeId: z.string().uuid().optional(),
   format: z.enum(['pdf', 'docx']).default('pdf'),
-  density: z.enum(['standard', 'compact']).default('standard'),
+  density: z.enum(['standard', 'compact']).optional(),
 });
 
 const slug = (s: string) => s.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60) || 'Resume';
@@ -20,17 +20,19 @@ export const POST = route(async (req: Request) => {
   const body = Body.parse(await readJson(req));
   let data;
   let name: string;
+  let density = body.density;
   if (body.resumeId) {
     const r = await prisma.resume.findUnique({ where: { id: body.resumeId } });
     if (!r) throw new HttpError(404, 'Resume not found.');
     data = normalizeResume(r.data);
     name = r.name;
+    density ??= (r as { density?: string }).density === 'compact' ? 'compact' : 'standard';
   } else {
     data = normalizeResume(await requireProfile());
     name = `${data.name || 'Resume'}`;
   }
   const filename = `${slug(name)}.${body.format}`;
-  const buf = body.format === 'pdf' ? (await renderPdf(data, body.density)).pdf : await renderDocx(data, body.density);
+  const buf = body.format === 'pdf' ? (await renderPdf(data, density ?? 'standard')).pdf : await renderDocx(data, density ?? 'standard');
   return new Response(new Uint8Array(buf), {
     headers: {
       'Content-Type': body.format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

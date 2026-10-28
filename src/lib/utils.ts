@@ -22,7 +22,7 @@ export function timeAgo(date: Date | string | null | undefined, now = Date.now()
   if (h < 24) return `${h}h ago`;
   const days = Math.round(h / 24);
   if (days < 30) return `${days}d ago`;
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' });
 }
 
 export const wordCount = (t: string) => (t.trim().match(/\S+/g) || []).length;

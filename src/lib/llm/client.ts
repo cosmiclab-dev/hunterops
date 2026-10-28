@@ -1,5 +1,6 @@
 // One chat() call for every provider. Routes pick nothing provider-specific:
 // they ask for a config (resolved from Settings) and send system + user text.
+import { timeLeft } from '../budget';
 import { HttpError } from '../http';
 import type { Settings } from '../settings';
 import { PROVIDERS, MODEL_ID_RE, isProviderId, type ProviderId, type WireFormat } from './providers';
@@ -123,7 +124,9 @@ function readContent(cfg: LlmConfig, data: any): string | undefined {
 export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
   if (!opts.session) opts = { ...opts, session: crypto.randomUUID() };
   // Thinking models can take well over a minute on long prompts.
-  const timeoutMs = opts.timeoutMs ?? 130_000;
+  const left = timeLeft() - 5_000;
+  if (left < 10_000) throw new HttpError(504, 'This ran out of time before the AI could finish. Try again, or pick a faster model in Settings.');
+  const timeoutMs = Math.min(opts.timeoutMs ?? 130_000, left);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const { headers, body } = buildRequest(cfg, messages, opts);
@@ -132,14 +135,22 @@ export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOp
     res = await fetch(cfg.endpoint, { method: 'POST', headers, body: JSON.stringify(body), signal: controller.signal });
   } catch (err: any) {
     if (err?.name === 'AbortError') {
+      clearTimeout(timer);
       throw new HttpError(504, `The model took longer than ${Math.round(timeoutMs / 1000)}s. Try again or pick a faster model.`);
     }
     console.error('[llm] network error', err);
+    clearTimeout(timer);
     throw new HttpError(502, `Could not reach ${PROVIDERS[cfg.provider].label}. Try again in a moment.`);
+  }
+  // The same timer covers reading the answer, which can stall after the headers.
+  let raw: string;
+  try {
+    raw = await res.text();
+  } catch {
+    throw new HttpError(504, `The model took longer than ${Math.round(timeoutMs / 1000)}s. Try again or pick a faster model.`);
   } finally {
     clearTimeout(timer);
   }
-  const raw = await res.text();
   if (!res.ok) {
     // Some models reject response_format or temperature, and not every provider
     // names the field in its error; retry once with the plainest request.

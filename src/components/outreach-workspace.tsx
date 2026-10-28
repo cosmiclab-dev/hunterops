@@ -100,17 +100,30 @@ function ScriptCard({ s, company, recipientName, jobId, onLogged }: { s: Script;
   const [error, setError] = useState('');
   const words = wordCount(text);
 
+  const [rowId, setRowId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // One log row per message: Save creates it, Mark sent updates the same row.
   async function log(status: 'drafted' | 'sent') {
+    if (busy) return;
+    setBusy(true);
     setError('');
     try {
-      await api('/api/outreach/log', {
-        method: 'POST',
-        json: { company, recipientRole: KIND_ROLE[s.kind] || s.label, recipientName: recipientName || undefined, channel, kind: s.kind, message: text, status, jobId },
-      });
+      if (rowId) {
+        await api(`/api/outreach/${rowId}`, { method: 'PATCH', json: { status, message: text } });
+      } else {
+        const out = await api<{ item: { id: string } }>('/api/outreach/log', {
+          method: 'POST',
+          json: { company, recipientRole: KIND_ROLE[s.kind] || s.label, recipientName: recipientName || undefined, channel, kind: s.kind, message: text, status, jobId },
+        });
+        setRowId(out.item.id);
+      }
       setSaved(status);
       onLogged();
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -128,8 +141,8 @@ function ScriptCard({ s, company, recipientName, jobId, onLogged }: { s: Script;
           {Object.entries(CHANNELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
         <div className="ml-auto flex gap-2">
-          <Button size="sm" variant="ghost" onClick={() => log('drafted')} disabled={!!saved}><Save /> {saved === 'drafted' ? 'Saved' : 'Save'}</Button>
-          <Button size="sm" onClick={() => log('sent')} disabled={saved === 'sent'}>{saved === 'sent' ? <CheckCheck /> : <Check />} {saved === 'sent' ? 'Logged' : 'Mark sent'}</Button>
+          <Button size="sm" variant="ghost" onClick={() => log('drafted')} disabled={!!saved || busy}><Save /> {saved === 'drafted' ? 'Saved' : 'Save'}</Button>
+          <Button size="sm" onClick={() => log('sent')} disabled={saved === 'sent' || busy}>{saved === 'sent' ? <CheckCheck /> : <Check />} {saved === 'sent' ? 'Logged' : 'Mark sent'}</Button>
         </div>
       </div>
       {saved === 'sent' && <p className="text-xs text-muted-foreground">Logged. You&apos;ll get a follow-up reminder in 5 days.</p>}

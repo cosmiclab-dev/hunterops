@@ -4,7 +4,7 @@
 import { promises as dns } from 'node:dns';
 import { atsRef } from './job-page';
 
-const ATS_HOSTS = /(greenhouse\.io|lever\.co|ashbyhq\.com|myworkdayjobs\.com|myworkdaysite\.com|smartrecruiters\.com|workable\.com|recruitee\.com|linkedin\.com|naukri\.com|indeed\.|remotive\.com|remoteok\.com|himalayas\.app|adzuna\.)/i;
+const ATS_HOSTS = /(greenhouse\.io|lever\.co|ashbyhq\.com|myworkdayjobs\.com|myworkdaysite\.com|smartrecruiters\.com|workable\.com|recruitee\.com|linkedin\.com|naukri\.com|indeed\.|remotive\.com|remoteok\.com|himalayas\.app|adzuna\.|glassdoor\.|foundit\.|monsterindia\.|instahyre\.com|wellfound\.com|angel\.co|cutshort\.io|iimjobs\.com|hirist\.|shine\.com|keka\.com|darwinbox\.|freshteam\.com|zohorecruit\.|bamboohr\.com|jobvite\.com|icims\.com|taleo\.net|successfactors\.|oraclecloud\.com|breezy\.hr|jazzhr\.com|teamtailor\.com|personio\.|workatastartup\.com|ycombinator\.com|apna\.co|timesjobs\.com|google\.com)/i;
 
 const fold = (s: string) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z\s-]/g, ' ').trim();
 
@@ -29,7 +29,9 @@ export function guessDomains(company: string, urls: string[] = []): string[] {
   for (const u of urls) {
     try {
       const host = new URL(u).hostname.toLowerCase().replace(/^(www|careers|jobs|join|apply)\./, '');
-      if (!ATS_HOSTS.test(host) && !atsRef(u)) out.push(host);
+      // Only a host that looks like the company counts; a job site's domain would guess its staff.
+      const key = fold(company).split(/\s+/)[0] || '';
+      if (!ATS_HOSTS.test(host) && !atsRef(u) && key.length >= 3 && host.replace(/[^a-z]/g, '').includes(key.replace(/[^a-z]/g, ''))) out.push(host);
     } catch { /* not a URL */ }
   }
   const base = fold(company).replace(/\b(inc|ltd|limited|pvt|private|llc|technologies|technology|labs|software|solutions|india|group|corp|corporation)\b/g, '').replace(/\s+/g, '');

@@ -30,7 +30,7 @@ export function ResumePanel({ jobId, saved }: { jobId: string; saved: Saved[] })
   }
 
   const get = (format: 'pdf' | 'docx', resumeId?: string) =>
-    run(`${format}${resumeId ?? ''}`, () => download('/api/resume/render', { format, density, resumeId }, `Resume.${format}`));
+    run(`${format}${resumeId ?? ''}`, () => download('/api/resume/render', { format, resumeId, ...(resumeId ? {} : { density }) }, `Resume.${format}`));
 
   return (
     <div className="flex flex-col gap-4">

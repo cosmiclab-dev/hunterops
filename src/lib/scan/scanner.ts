@@ -19,7 +19,9 @@ const MAX_AGE_DAYS = 45;
 const norm = (s: string) => ` ${String(s || '').toLowerCase().replace(/[^a-z0-9+#]+/g, ' ').trim()} `;
 
 export function titleMatcher(keywords: string[], exclude: string[]) {
-  const inc = keywords.map(norm).filter((k) => k.trim());
+  // "recruiter" also finds "Recruiting Coordinator", "sourcer" finds "Sourcing Specialist".
+  const stems = keywords.flatMap((k) => (/^[a-z]+er$/i.test(k.trim()) ? [k.trim().replace(/er$/i, 'ing')] : []));
+  const inc = [...keywords, ...stems].map(norm).filter((k) => k.trim());
   const exc = exclude.map(norm).filter((k) => k.trim());
   return (title: string) => {
     const t = norm(title);
@@ -163,11 +165,21 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
   const boardsAt = settings.get('boards_scanned_at');
   const scanBoards = !companyIds && (force || trigger === 'cron' || !boardsAt || Date.now() - Date.parse(boardsAt) > BOARD_INTERVAL_MS);
   const ctx: ScanCtx = {
+    deadline,
     searchTerms: prefs.searchTerms,
     settings: { adzuna_app_id: settings.get('adzuna_app_id'), adzuna_app_key: settings.get('adzuna_app_key') },
   };
 
-  const tasks: (() => Promise<TaskResult>)[] = companies.map((c) => async () => {
+  // Job boards go first: they are few and cover many companies, so a slow
+  // company board never pushes them out of the time budget.
+  const boardNames = scanBoards ? Object.keys(BOARD_FETCHERS) : [];
+  const tasks: (() => Promise<TaskResult>)[] = boardNames.map((name) => async () => {
+    const res = await BOARD_FETCHERS[name](ctx);
+    if (!Array.isArray(res)) return { name, fetched: 0, kept: [], note: res?.skipped };
+    return { name, fetched: res.length, kept: filterPostings(res, prefs) };
+  });
+  const labels = [...boardNames, ...companies.map((c) => c.name)];
+  tasks.push(...companies.map((c) => async () => {
     const fetcher = ATS_FETCHERS[c.atsType];
     try {
       if (!fetcher) throw new Error(`No fetcher for ${c.atsType}`);
@@ -187,25 +199,18 @@ export async function runScan(settings: Settings, opts: { trigger?: string; budg
       });
       throw new Error(`${c.name}: ${(err as Error).message}`);
     }
-  });
-  const boardNames = scanBoards ? Object.keys(BOARD_FETCHERS) : [];
-  for (const name of boardNames) {
-    tasks.push(async () => {
-      const res = await BOARD_FETCHERS[name](ctx);
-      if (!Array.isArray(res)) return { name, fetched: 0, kept: [], note: res?.skipped };
-      return { name, fetched: res.length, kept: filterPostings(res, prefs) };
-    });
-  }
+  }));
 
   const results = await pool(tasks, deadline);
-  if (scanBoards) await saveInternal('boards_scanned_at', new Date().toISOString());
+  // Only count the boards as checked if at least one of them actually ran.
+  if (scanBoards && results.slice(0, boardNames.length).some((r) => !('skipped' in r))) await saveInternal('boards_scanned_at', new Date().toISOString());
 
   const errors: { source: string; error: string }[] = [];
   const rows: Kept[] = [];
   let fetched = 0;
   let skipped = 0;
   results.forEach((r, i) => {
-    const label = i < companies.length ? companies[i].name : boardNames[i - companies.length];
+    const label = labels[i];
     if ('error' in r) errors.push({ source: label, error: clip(r.error, 300) as string });
     else if ('skipped' in r) skipped++;
     else {

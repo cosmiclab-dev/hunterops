@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 set -a; . ./.env.e2e; set +a
 export SMTP_OUT=${SMTP_OUT:-/tmp/hunterops-mail.jsonl}
 # Outside-web stand-ins (search API, ATS APIs, job pages) on localhost.
-export ALLOW_PRIVATE_FETCH=1 SEARCH_API_BASE=http://127.0.0.1:4020 ATS_API_BASE=http://127.0.0.1:4020
+export ALLOW_PRIVATE_FETCH=1 SEARCH_API_BASE=http://127.0.0.1:4020 ATS_API_BASE=http://127.0.0.1:4020 READER_BASE=http://127.0.0.1:4020/reader
 npx prisma migrate reset --force --skip-generate --skip-seed >/dev/null
 [ -n "${SKIP_BUILD:-}" ] || npx next build >/dev/null
 node e2e/mock-llm.mjs & LLM=$!

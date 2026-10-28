@@ -11,7 +11,7 @@ import { loadSettings, type Settings } from './settings';
 export const CRAWL_TIMEOUT_MS = 30_000;
 
 export type Crawler = { base: string; token: string | null };
-export type CrawledPage = { url: string; status: number; html: string; markdown: string };
+export type CrawledPage = { url: string; status: number; html: string; markdown: string; title?: string };
 
 export function crawlerFrom(settings: Settings): Crawler | null {
   const raw = (settings.get('crawl4ai_url') || '').trim().replace(/\/+$/, '');
@@ -77,7 +77,54 @@ export async function crawlPage(crawler: Crawler, target: string): Promise<Crawl
   };
 }
 
+// Built-in fallback when no Crawl4AI server is set: Jina Reader (r.jina.ai), a
+// hosted service that renders a page in a browser and returns its text. Free
+// without a key at a low rate, which fits one person opening job pages. Same
+// rule as above: refused pages stay refused.
+export const HOSTED_READER_BASE = (process.env.READER_BASE || 'https://r.jina.ai').replace(/\/+$/, '');
+
+export async function hostedReadPage(target: string): Promise<CrawledPage> {
+  const u = parsePublicUrl(target);
+  await assertPublicHost(u);
+  const res = await fetchPublic(`${HOSTED_READER_BASE}/${u.toString()}`, {
+    accept: 'application/json',
+    timeoutMs: CRAWL_TIMEOUT_MS,
+    headers: { 'X-Timeout': '25' },
+  });
+  if (res.status === 429) throw new HttpError(429, 'The page reader is busy. Try again in a minute.');
+  let data: any;
+  try {
+    data = JSON.parse(res.body);
+  } catch {
+    throw new HttpError(502, `The page reader answered HTTP ${res.status}.`);
+  }
+  const d = data?.data;
+  // The reader answers 422 or similar when the target itself failed; its JSON says why.
+  if (res.status >= 400 || !d) {
+    const why = String(data?.readableMessage || data?.message || '').slice(0, 200);
+    if (/404|not found/i.test(why)) return { url: u.toString(), status: 404, html: '', markdown: '' };
+    throw new HttpError(502, `The page reader could not open the page${why ? `: ${why}` : '.'}`);
+  }
+  const markdown = String(d.content || '');
+  const title = String(d.title || '').trim();
+  return { url: String(d.url || u.toString()), status: 200, html: '', markdown, title };
+}
+
+// The reader to use for pages that need a browser: the person's own Crawl4AI server, else the hosted one.
+export async function readWithBrowser(target: string): Promise<CrawledPage & { via: 'crawl4ai' | 'reader' }> {
+  const crawler = await loadCrawler();
+  if (crawler) return { ...(await crawlPage(crawler, target)), via: 'crawl4ai' };
+  return { ...(await hostedReadPage(target)), via: 'reader' };
+}
+
 // Quick check for Settings and the self-test.
+export async function testHostedReader(): Promise<string> {
+  const started = Date.now();
+  const page = await hostedReadPage('https://example.com/');
+  if (!page.markdown) throw new HttpError(502, 'The page reader answered but returned an empty page.');
+  return `Built-in reader read example.com in ${((Date.now() - started) / 1000).toFixed(1)}s.`;
+}
+
 export async function testCrawler(crawler: Crawler): Promise<string> {
   const started = Date.now();
   const page = await crawlPage(crawler, 'https://example.com/');

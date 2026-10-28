@@ -10,12 +10,35 @@ const MAX_BYTES = 3 * 1024 * 1024;
 const MAX_REDIRECTS = 4;
 const UA = 'Mozilla/5.0 (compatible; HunterOps/2.0; personal job search)';
 
+// IPv6 text to its 8 groups; handles "::" and a dotted IPv4 tail (::ffff:1.2.3.4).
+function v6Groups(ip: string): number[] | null {
+  let v = ip.toLowerCase().split('%')[0];
+  const dotted = v.match(/(\d+\.\d+\.\d+\.\d+)$/);
+  if (dotted) {
+    const [a, b, c, d] = dotted[1].split('.').map(Number);
+    v = v.slice(0, -dotted[1].length) + `${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [head, tail] = v.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail !== undefined && tail ? tail.split(':') : [];
+  const fill = v.includes('::') ? 8 - h.length - t.length : 0;
+  const groups = [...h, ...Array(fill).fill('0'), ...t].map((g) => parseInt(g, 16));
+  return groups.length === 8 && groups.every((g) => g >= 0 && g <= 0xffff) ? groups : null;
+}
+
+const v4From = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
+
 export function isPrivateIp(ip: string): boolean {
   if (isIP(ip) === 6) {
-    const v = ip.toLowerCase();
-    if (v === '::1' || v === '::' || v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe80')) return true;
-    const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    return mapped ? isPrivateIp(mapped[1]) : false;
+    const g = v6Groups(ip);
+    if (!g) return true; // unreadable: refuse
+    if (g.slice(0, 7).every((x) => x === 0)) return true; // :: and ::1, and IPv4-compatible ::a.b.c.d
+    if ((g[0] & 0xfe00) === 0xfc00 || (g[0] & 0xffc0) === 0xfe80 || (g[0] & 0xffc0) === 0xfec0 || (g[0] & 0xff00) === 0xff00) return true;
+    // IPv4 hidden inside IPv6: mapped (::ffff:a.b.c.d), NAT64 (64:ff9b::a.b.c.d) and 6to4 (2002:aabb:ccdd::).
+    if (g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff) return isPrivateIp(v4From(g[6], g[7]));
+    if (g[0] === 0x64 && g[1] === 0xff9b) return isPrivateIp(v4From(g[6], g[7]));
+    if (g[0] === 0x2002) return isPrivateIp(v4From(g[1], g[2]));
+    return false;
   }
   const [a, b] = ip.split('.').map(Number);
   return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31)

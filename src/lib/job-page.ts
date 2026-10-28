@@ -10,7 +10,7 @@ import { workdayPostedOn } from './scan/sources';
 import { salaryFromText } from './salary';
 import { looksLikeBotCheck } from './bot-check';
 import { HttpError } from './http';
-import { crawlPage, loadCrawler } from './crawl4ai';
+import { readWithBrowser } from './crawl4ai';
 
 export type JobPage = {
   url: string;              // the canonical posting URL
@@ -28,7 +28,7 @@ export type JobPage = {
   fields: FormField[];      // application form fields, when the site exposes them
   embedUrl: string | null;  // an official embeddable application form (Greenhouse)
   frameable: boolean | null;
-  via: 'direct' | 'crawl4ai'; // how a non-ATS page was read
+  via: 'direct' | 'crawl4ai' | 'reader'; // how a non-ATS page was read
 };
 
 const nice = (s: string) => s.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -142,7 +142,7 @@ async function lever(ref: Extract<AtsRef, { type: 'lever' }>, url: string): Prom
 async function ashby(ref: Extract<AtsRef, { type: 'ashby' }>, url: string): Promise<JobPage> {
   const data = await fetchPublicJson(api(`https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(ref.slug)}?includeCompensation=true`));
   const j = (data.jobs || []).find((x: any) => x.id === ref.id || String(x.jobUrl || '').includes(ref.id));
-  if (!j) throw Object.assign(new Error('closed'), { status: 404 });
+  if (!j) throw new HttpError(404, 'That posting was not found. It may have closed.');
   const page = emptyPage(j.jobUrl || url);
   return {
     ...page,
@@ -242,17 +242,16 @@ async function generic(url: string): Promise<JobPage> {
   const hasPosting = Boolean(res && direct && jobPostingFromHtml(res.body)?.description);
   const needsBrowser = !refused && (fetchErr || !direct || (!hasPosting && direct.description.length < THIN_TEXT));
   if (needsBrowser) {
-    const crawler = await loadCrawler();
-    if (crawler) {
+    {
       try {
-        const c = await crawlPage(crawler, url);
+        const c = await readWithBrowser(url);
         if (c.status === 404 || c.status === 410) throw new HttpError(404, 'That posting was not found. It may have closed.');
         const text = c.html ? htmlToText(c.html) || '' : '';
         if (c.status < 400 && !looksLikeBotCheck(text || c.markdown)) {
           const page = c.html ? pageFromHtml(c.html, c.url, null) : { ...emptyPage(c.url), description: c.markdown.slice(0, 20000), html: textToHtml(c.markdown) };
           if (!page.description && c.markdown) Object.assign(page, { description: c.markdown.slice(0, 20000), html: textToHtml(c.markdown) });
           if (page.description.length > (direct?.description.length ?? 0)) {
-            return { ...page, title: page.title || direct?.title || '', frameable: direct?.frameable ?? null, via: 'crawl4ai' };
+            return { ...page, title: page.title || c.title || direct?.title || '', frameable: direct?.frameable ?? null, via: c.via };
           }
         }
       } catch (err) {
@@ -261,9 +260,13 @@ async function generic(url: string): Promise<JobPage> {
       }
     }
   }
+  // A human-check page served with HTTP 200 is not the posting.
+  if (refused) {
+    const host = new URL(res!.url).hostname;
+    throw new HttpError(502, res!.status < 400 ? `${host} shows a "are you human" check to apps. Open it in Safari instead.` : `${host} does not let apps read its pages (HTTP ${res!.status}). Open it in Safari instead.`);
+  }
   if (direct) return direct;
   if (fetchErr) throw fetchErr;
-  if (refused) throw new HttpError(502, `${new URL(res!.url).hostname} does not let apps read its pages (HTTP ${res!.status}). Open it in Safari instead.`);
   throw new HttpError(502, `The site answered HTTP ${res!.status}. Try again later or open it in Safari.`);
 }
 

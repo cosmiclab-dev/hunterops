@@ -42,8 +42,12 @@ export const POST = route(async (req: Request) => {
   const company = job?.company || body.company.trim();
   if (!company) throw new HttpError(400, 'Pick a job or type the company name.');
   const profile = await requireProfile();
-  const previous = body.kind === 'follow_up' && job
-    ? (await prisma.email.findFirst({ where: { jobId: job.id, status: 'SENT' }, orderBy: { sentAt: 'desc' } }))?.body
+  // A follow-up refers to the last email sent to the same person, with or without a job.
+  const previous = body.kind === 'follow_up'
+    ? (await prisma.email.findFirst({
+      where: { status: 'SENT', toEmail: { equals: body.toEmail, mode: 'insensitive' }, ...(job ? { jobId: job.id } : {}) },
+      orderBy: { sentAt: 'desc' },
+    }) ?? (job ? await prisma.email.findFirst({ where: { status: 'SENT', jobId: job.id }, orderBy: { sentAt: 'desc' } }) : null))?.body
     : undefined;
   const out = await generateEmail(await loadSettings(), {
     kind: body.kind,

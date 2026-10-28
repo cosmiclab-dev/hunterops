@@ -106,17 +106,26 @@ export type FormField = {
   options?: string[];
 };
 
-const FIELD_TYPES = new Set(['text', 'email', 'tel', 'url', 'number', 'date', 'file', 'checkbox']);
+const FIELD_TYPES = new Set(['text', 'email', 'tel', 'url', 'number', 'date', 'file', 'checkbox', 'radio']);
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 60);
 
 // The fields of the application form on a page (first <form> with a file or
 // several inputs). Hidden and submit inputs are skipped.
 export function formFields(html: string): FormField[] {
-  const root = parse(html, { comment: false });
+  const doc = parse(html, { comment: false });
+  // The application form: the <form> with a file input, else the one with the most fields.
+  // Footer newsletter boxes and search bars stay out.
+  const forms = doc.querySelectorAll('form');
+  const count = (f: (typeof forms)[number]) => f.querySelectorAll('input, textarea, select').length;
+  const root = forms.find((f) => f.querySelector('input[type=file]')) || [...forms].sort((a, b) => count(b) - count(a)).find((f) => count(f) >= 3) || doc;
   const labels = new Map<string, string>();
-  for (const l of root.querySelectorAll('label')) {
+  const starred = new Set<string>();
+  for (const l of doc.querySelectorAll('label')) {
     const f = l.getAttribute('for');
-    if (f) labels.set(f, l.text.replace(/\s+/g, ' ').replace(/\*\s*$/, '').trim());
+    if (!f) continue;
+    const text = l.text.replace(/\s+/g, ' ').trim();
+    if (/\*\s*$/.test(text)) starred.add(f);
+    labels.set(f, text.replace(/\*\s*$/, '').trim());
   }
   const fields: FormField[] = [];
   const seen = new Set<string>();
@@ -130,11 +139,24 @@ export function formFields(html: string): FormField[] {
     const label = (labels.get(id) || el.getAttribute('aria-label') || wrapLabel || el.getAttribute('placeholder') || name || '').replace(/\s+/g, ' ').replace(/\*\s*$/, '').trim();
     if (!label || /captcha|csrf|token|honeypot/i.test(`${name} ${label}`)) continue;
     const key = name || slug(label);
+    // Radio buttons are one question: group them by name, each button an option.
+    if (rawType === 'radio') {
+      const group = fields.find((x) => x.key === key);
+      const option = (labels.get(id) || wrapLabel || el.getAttribute('value') || '').replace(/\s+/g, ' ').trim();
+      if (group) {
+        if (option) group.options = [...(group.options || []), option].slice(0, 40);
+        continue;
+      }
+      const legend = el.closest('fieldset')?.querySelector('legend')?.text.replace(/\s+/g, ' ').replace(/\*\s*$/, '').trim();
+      seen.add(key);
+      fields.push({ key, label: (legend || name || option).slice(0, 300), type: 'select', required: el.hasAttribute('required'), options: option ? [option] : [] });
+      continue;
+    }
     if (seen.has(key)) continue;
     seen.add(key);
     const type = (tag === 'textarea' ? 'textarea' : tag === 'select' ? 'select' : rawType) as FormField['type'];
     const options = tag === 'select' ? el.querySelectorAll('option').map((o) => o.text.trim()).filter((o) => o && !/^select|^--/i.test(o)).slice(0, 40) : undefined;
-    fields.push({ key, label: label.slice(0, 300), type, required: el.hasAttribute('required') || el.getAttribute('aria-required') === 'true' || /\*/.test(labels.get(id) || ''), options });
+    fields.push({ key, label: label.slice(0, 300), type, required: el.hasAttribute('required') || el.getAttribute('aria-required') === 'true' || starred.has(id), options });
     if (fields.length >= 60) break;
   }
   return fields;
