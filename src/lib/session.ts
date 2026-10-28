@@ -6,7 +6,8 @@ export const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 const enc = new TextEncoder();
 
 async function hmac(value: string) {
-  const secret = process.env.APP_SECRET || process.env.APP_PASSWORD || '';
+  // The password is part of the key, so changing it signs out every device.
+  const secret = `${process.env.APP_SECRET || ''}:${process.env.APP_PASSWORD || ''}`;
   const key = await crypto.subtle.importKey('raw', enc.encode(`session:${secret}`), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, enc.encode(value)));
   return btoa(String.fromCharCode(...sig)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

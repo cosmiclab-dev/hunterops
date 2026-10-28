@@ -21,7 +21,7 @@ function LoginForm() {
     try {
       await api('/api/auth/login', { method: 'POST', json: { password } });
       const next = params.get('next');
-      window.location.href = next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+      window.location.href = safeNext(next);
     } catch (e2) {
       setErr((e2 as Error).message);
       setBusy(false);
@@ -42,6 +42,17 @@ function LoginForm() {
       {err && <p className="text-sm text-destructive" role="alert">{err}</p>}
     </form>
   );
+}
+
+// Only return to a page on this site: "/\\evil.com" or "/\t/evil.com" would leave it.
+function safeNext(next: string | null) {
+  if (!next || !/^\/[^/\\]/.test(next)) return '/';
+  try {
+    const u = new URL(next, window.location.origin);
+    return u.origin === window.location.origin ? u.pathname + u.search + u.hash : '/';
+  } catch {
+    return '/';
+  }
 }
 
 export default function LoginPage() {

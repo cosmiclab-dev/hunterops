@@ -71,6 +71,11 @@ export const POST = route(async () => {
       const [jobs, contacts] = await Promise.all([prisma.job.count(), prisma.contact.count()]);
       return `Connected. ${jobs} jobs and ${contacts} contacts saved.`;
     }),
+    run('signin', 'Your data', 'Sign-in protection', async () => {
+      if (!process.env.APP_PASSWORD) throw new Error('No APP_PASSWORD is set, so anyone with the link can open this app and your saved keys. Add APP_PASSWORD in Vercel, Settings, Environment Variables, then redeploy.');
+      if (!process.env.APP_SECRET) throw new Error('APP_SECRET is not set. Saved keys are not encrypted with a separate secret. Add APP_SECRET in Vercel.');
+      return 'Password sign-in is on and saved keys are encrypted.';
+    }),
     run('profile', 'Your data', 'Profile', async () => {
       const p = await loadProfile();
       if (profileIsEmpty(p)) throw new Error('No profile yet. Fill it in on the Profile page so jobs can be scored.');

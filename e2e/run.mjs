@@ -486,7 +486,7 @@ await step('Discover in-app: free search (no key) finds ATS jobs and people; Ser
   assert.equal(free.data.people[0].name, 'Meera Iyer - Head of Talent Acquisition - Acme Cloud');
   const st = await call('POST', '/api/selftest');
   assert.equal(st.status, 200, JSON.stringify(st.data));
-  for (const id of ['db', 'profile', 'ai', 'search-bing', 'search-ddg']) {
+  for (const id of ['db', 'signin', 'profile', 'ai', 'search-bing', 'search-ddg']) {
     const c = st.data.checks.find((x) => x.id === id);
     assert.ok(c, `self-test check ${id} missing`);
     assert.equal(c.ok, true, `${id}: ${c.detail}`);
@@ -607,6 +607,17 @@ await step('every app page renders for a signed-in user', async () => {
   const old = await call('GET', '/outreach', undefined, { raw: true });
   assert.ok([307, 308].includes(old.status));
   assert.match(old.headers.get('location'), /\/mailroom/);
+});
+
+await step('security: cross-site writes refused, signed-out API refused', async () => {
+  const evil = await call('POST', '/api/settings', { values: {} }, { raw: true, headers: { origin: 'https://evil.example' } });
+  assert.equal(evil.status, 403);
+  const ours = await call('PUT', '/api/settings', { values: { writing_tone: 'warm' } }, { raw: true, headers: { origin: BASE } });
+  assert.equal(ours.status, 200);
+  const anon = await fetch(BASE + '/api/settings');
+  assert.equal(anon.status, 401);
+  const forged = await fetch(BASE + '/api/settings', { headers: { cookie: 'ho_session=9999999999.forged' } });
+  assert.equal(forged.status, 401);
 });
 
 console.log(`\n${passed} end-to-end checks passed.`);
