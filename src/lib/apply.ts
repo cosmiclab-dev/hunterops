@@ -87,9 +87,10 @@ export async function runApplication(jobId: string, task: Tracker) {
     const board = isAggregatorUrl(job.url);
     await tracked(task, 'form', async () => {
       if (!board) return 'own';
-      const original = await findOriginalPosting(job, settings);
+      const original = job.employerUrl ? { url: job.employerUrl, via: 'board' as const } : await findOriginalPosting(job, settings);
       if (original) {
         formUrl = original.url;
+        if (!job.employerUrl) await prisma.job.update({ where: { id: job.id }, data: { employerUrl: original.url } });
         notes.push(`Found the employer's own posting${original.via === 'search' ? ' with a web search' : ' on their careers board'}: the answers follow its real form.`);
         return new URL(original.url).hostname;
       }

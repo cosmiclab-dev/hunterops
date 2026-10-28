@@ -4,6 +4,8 @@ import { prisma } from '@/lib/db';
 import { HttpError, ok, readJson, route } from '@/lib/http';
 import { checkFrameable, loadJobPage } from '@/lib/job-page';
 import { grillPage } from '@/lib/jobs';
+import { findOriginalPosting, isAggregatorUrl } from '@/lib/original-posting';
+import { loadSettings } from '@/lib/settings';
 import { clip } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
@@ -17,9 +19,31 @@ export const POST = route(async (req: Request) => {
   const body = Body.parse(await readJson(req));
   const job = body.jobId ? await prisma.job.findUnique({ where: { id: body.jobId }, include: { artifact: true, companyRef: true } }) : null;
   if (body.jobId && !job) throw new HttpError(404, 'Job not found.');
-  const url = job?.url || body.url;
-  if (!url) throw new HttpError(400, 'Paste a job link to open.');
-  const page = await loadJobPage(url, job?.companyRef);
+  if (!job?.url && !body.url) throw new HttpError(400, 'Paste a job link to open.');
+  // A job board listing (Adzuna) refuses apps and hides the form: open the
+  // same job on the employer's own site instead, found once and kept.
+  let url = job?.url || body.url!;
+  let board: string | null = null;
+  if (job && isAggregatorUrl(job.url)) {
+    board = new URL(job.url).hostname.replace(/^www\./, '');
+    let employer = job.employerUrl;
+    if (!employer) {
+      employer = (await findOriginalPosting(job, await loadSettings()).catch(() => null))?.url ?? null;
+      if (employer) await prisma.job.update({ where: { id: job.id }, data: { employerUrl: employer } });
+    }
+    if (employer) url = employer;
+  }
+  const listing = job?.url;
+  const employer = listing && url !== listing;
+  let page = await loadJobPage(url, employer ? null : job?.companyRef).catch((err) => {
+    if (!employer) throw err;
+    return null;
+  });
+  // The employer's page would not open: fall back to the listing.
+  if (!page) {
+    url = listing!;
+    page = await loadJobPage(url, job?.companyRef);
+  }
   const [frameable, grill] = await Promise.all([
     page.frameable ?? checkFrameable(page.url),
     grillPage(page),
@@ -38,6 +62,9 @@ export const POST = route(async (req: Request) => {
   }
   return ok({
     page: { ...page, frameable },
+    // Set when the listing came from a job board and this is the employer's own posting.
+    via: board && url !== job?.url ? { board, listing: job!.url } : null,
+    board: board && url === job?.url ? board : null,
     grill,
     job: existing ? { id: existing.id, status: existing.status, grillScore: grill?.score ?? existing.grillScore } : null,
     autofill: existing?.artifact?.autofill ?? null,

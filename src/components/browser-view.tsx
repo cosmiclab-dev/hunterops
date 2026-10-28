@@ -18,7 +18,7 @@ type Page = {
 };
 type Answer = { key: string; label: string; type: string; required: boolean; value: string; source: 'profile' | 'ai' | 'you'; note?: string };
 type Sheet = { answers: Answer[]; generic: boolean; model: string | null };
-type Opened = { page: Page; grill: GrillResult | null; job: { id: string; status: string; grillScore: number | null } | null; autofill: Sheet | null; coverLetter?: string | null };
+type Opened = { page: Page; via?: { board: string; listing: string } | null; board?: string | null; grill: GrillResult | null; job: { id: string; status: string; grillScore: number | null } | null; autofill: Sheet | null; coverLetter?: string | null };
 
 type View = 'reader' | 'live' | 'apply';
 type Tool = 'analyze' | 'autofill' | 'resume' | 'email';
@@ -83,10 +83,15 @@ export function BrowserView({ jobId: initialJobId, url, initialView }: { jobId?:
       const d = await api<Opened>('/api/browser/open', { method: 'POST', json: initialJobId ? { jobId: initialJobId } : { url } });
       setData(d);
       if (d.autofill) setSheet(d.autofill);
+      // A job board listing opened on the employer's site: show their form straight away.
+      if (d.via && !initialView && (d.page.embedUrl || d.page.frameable !== false)) {
+        setView('apply');
+        if (d.autofill) setTool('autofill');
+      }
     } catch (e) {
       setErr((e as Error).message);
     }
-  }, [initialJobId, url]);
+  }, [initialJobId, url, initialView]);
   useEffect(() => { open(); }, [open]);
 
   const srcDoc = useMemo(() => (data ? readerDoc(data.page, dark) : ''), [data, dark]);
@@ -191,6 +196,12 @@ export function BrowserView({ jobId: initialJobId, url, initialView }: { jobId?:
         </Button>
       </div>
 
+      {data.via && (
+        <p className="border-b bg-success/10 px-4 py-2 text-xs leading-5 text-foreground" data-testid="employer-banner">
+          Opened <b>{p.company || host}</b>’s own posting. {data.via.board} hides the application form from apps, so HunterOps found the same job on the employer’s site.{' '}
+          <a href={data.via.listing} target="_blank" rel="noopener noreferrer" className="font-medium text-primary">See the {data.via.board} listing</a>
+        </p>
+      )}
       <div className={cn('grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)]', panel ? 'lg:grid-cols-[minmax(0,1fr)_400px]' : 'lg:grid-cols-1')}>
         {/* Page */}
         <div className="relative h-[70vh] min-h-0 border-b bg-background lg:h-auto lg:border-b-0">
@@ -200,14 +211,14 @@ export function BrowserView({ jobId: initialJobId, url, initialView }: { jobId?:
           {view === 'live' && (canLive ? (
             <iframe title="Live page" src={p.url} className="h-full w-full" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox" referrerPolicy="no-referrer" />
           ) : (
-            <FrameBlocked host={host} url={p.url} onReader={() => setView('reader')} />
+            <FrameBlocked host={host} url={p.url} board={data.board} onReader={() => setView('reader')} />
           ))}
           {view === 'apply' && (p.embedUrl ? (
             <iframe title="Application form" src={p.embedUrl} className="h-full w-full" data-testid="apply-frame" />
           ) : canLive ? (
             <iframe title="Application form" src={p.applyUrl} className="h-full w-full" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox" />
           ) : (
-            <FrameBlocked host={host} url={p.applyUrl} onReader={() => setView('reader')} />
+            <FrameBlocked host={host} url={p.applyUrl} board={data.board} onReader={() => setView('reader')} />
           ))}
         </div>
 
@@ -291,13 +302,17 @@ export function BrowserView({ jobId: initialJobId, url, initialView }: { jobId?:
   );
 }
 
-function FrameBlocked({ host, url, onReader }: { host: string; url: string; onReader: () => void }) {
+function FrameBlocked({ host, url, board, onReader }: { host: string; url: string; board?: string | null; onReader: () => void }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center" data-testid="frame-blocked">
       <Globe className="h-8 w-8 text-muted-foreground" />
       <div className="max-w-sm">
         <p className="font-semibold">{host} does not allow being shown inside other apps</p>
-        <p className="mt-1 text-sm leading-6 text-muted-foreground">The Reader view has the full posting. To submit, open the form on the site; your Auto-fill answers stay here to copy.</p>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          {board
+            ? `HunterOps looked for this job on the employer’s own careers site and did not find it, so the form is only on ${board}. Open the site to apply; your Auto-fill answers stay here to copy.`
+            : 'The Reader view has the full posting. To submit, open the form on the site; your Auto-fill answers stay here to copy.'}
+        </p>
       </div>
       <div className="flex gap-2">
         <Button variant="outline" onClick={onReader}><BookOpen /> Reader</Button>

@@ -199,6 +199,16 @@ await step('Apply with AI on an Adzuna job finds the employer’s own posting an
   await shot('apply-adzuna');
 });
 
+await step('open the Adzuna job in the Browser: the employer’s own posting and form open instead of the blocked page', async () => {
+  const jobId = page.url().split('/apply/')[1].split(/[?#]/)[0];
+  await page.goto(`/browser/${jobId}`);
+  await page.getByTestId('employer-banner').waitFor({ timeout: 60_000 });
+  await page.getByTestId('employer-banner').getByText(/hides the application form/).waitFor();
+  assert.equal(await page.getByTestId('frame-blocked').count(), 0);
+  await page.getByRole('tab', { name: 'Apply form', selected: true }).waitFor();
+  await shot('browser-employer-form');
+});
+
 await step('start Apply, press back: the progress stays on every screen, then a pop-up and the bell say it is ready', async () => {
   await tab('Jobs').click();
   await page.getByTestId('job-card').filter({ hasText: 'Talent Acquisition Partner, GTM' }).getByTestId('card-apply').click();
