@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { RefreshCw } from 'lucide-react';
@@ -23,13 +24,16 @@ export function ScanButton({ label = 'Scan now' }: { label?: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [found, setFound] = useState(0);
 
   async function scan() {
     setBusy(true);
+    setFound(0);
     setMsg('Checking company boards and job sites… (about 30 seconds)');
     try {
       const s = await api<Summary>('/api/scan', { method: 'POST', json: { force: true } });
       setMsg(scanMessage(s));
+      setFound(s.inserted);
       router.refresh();
     } catch (e) {
       setMsg((e as Error).message);
@@ -43,7 +47,12 @@ export function ScanButton({ label = 'Scan now' }: { label?: string }) {
       <Button size="sm" onClick={scan} disabled={busy} data-testid="scan">
         <RefreshCw className={busy ? 'animate-spin' : ''} /> {busy ? 'Scanning' : label}
       </Button>
-      {msg && <p className="max-w-72 text-right text-xs leading-5 opacity-70" role="status">{msg}</p>}
+      {msg && (
+        <p className="max-w-72 text-right text-xs leading-5" role="status">
+          <span className="opacity-70">{msg}</span>
+          {found > 0 && <> <Link href="/jobs?view=new&sort=newest" className="font-semibold underline underline-offset-2">See them</Link></>}
+        </p>
+      )}
     </div>
   );
 }

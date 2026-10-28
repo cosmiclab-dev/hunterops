@@ -5,6 +5,8 @@
 import http from 'node:http';
 
 const PORT = Number(process.env.MOCK_WEB_PORT || 4020);
+// The user-journey run turns on a few company boards and Adzuna for its scan.
+const BOARDS = process.env.MOCK_BOARDS === '1';
 const BASE = `http://127.0.0.1:${PORT}`;
 export const searches = [];
 export const crawls = [];
@@ -88,6 +90,44 @@ http.createServer((req, res) => {
       return send(res, 200, `<html><body><table>${rows.join('')}</table></body></html>`);
     }
 
+    // A starter company board with two recruiter roles and one that the scan skips.
+    if (BOARDS && p === '/v1/boards/figma/jobs') {
+      const at = new Date(Date.now() - 3 * 3600_000).toISOString();
+      return send(res, 200, { jobs: [
+        { id: 9101, title: 'Senior Technical Recruiter', absolute_url: 'https://job-boards.greenhouse.io/figma/jobs/9101', location: { name: 'Bengaluru, India' }, first_published: at, content: GH_JD },
+        { id: 9102, title: 'Talent Acquisition Partner, GTM', absolute_url: 'https://job-boards.greenhouse.io/figma/jobs/9102', location: { name: 'Remote - India' }, first_published: at, content: '&lt;p&gt;Partner with sales leaders. 5+ years of recruiting, LinkedIn Recruiter, Greenhouse.&lt;/p&gt;' },
+        { id: 9103, title: 'Software Engineer, Infrastructure', absolute_url: 'https://job-boards.greenhouse.io/figma/jobs/9103', location: { name: 'Bengaluru, India' }, first_published: at, content: '&lt;p&gt;Go and Kubernetes.&lt;/p&gt;' },
+      ] });
+    }
+    if (p === '/v1/boards/figma/jobs/9101') {
+      return send(res, 200, {
+        id: 9101, title: 'Senior Technical Recruiter', company_name: 'Figma', absolute_url: 'https://job-boards.greenhouse.io/figma/jobs/9101',
+        location: { name: 'Bengaluru, India' }, first_published: new Date(Date.now() - 3 * 3600_000).toISOString(), content: GH_JD,
+        questions: [
+          { label: 'First Name', required: true, fields: [{ name: 'first_name', type: 'input_text' }] },
+          { label: 'Last Name', required: true, fields: [{ name: 'last_name', type: 'input_text' }] },
+          { label: 'Email', required: true, fields: [{ name: 'email', type: 'input_text' }] },
+          { label: 'Resume/CV', required: true, fields: [{ name: 'resume', type: 'input_file' }] },
+          { label: 'What is your notice period?', required: true, fields: [{ name: 'question_9', type: 'input_text' }] },
+        ],
+      });
+    }
+    // Workday: the list has no descriptions; the detail call has one.
+    if (BOARDS && p === '/wday/cxs/amat/External/jobs' && req.method === 'POST') {
+      const body = JSON.parse(raw || '{}');
+      return send(res, 200, { jobPostings: body.offset ? [] : [{ title: 'Talent Sourcer', externalPath: '/job/Bangalore-IND/Talent-Sourcer_R1', locationsText: 'Bangalore, IND', postedOn: 'Posted Today' }] });
+    }
+    if (p === '/wday/cxs/amat/External/job/Bangalore-IND/Talent-Sourcer_R1') {
+      return send(res, 200, { jobPostingInfo: { title: 'Talent Sourcer', jobDescription: '<p>Source engineers for our Bangalore R&amp;D centre.</p><p>Requirements: 3+ years of sourcing, Boolean search, LinkedIn Recruiter.</p>' } });
+    }
+    // Adzuna: a listing whose page hides the employer's form; the same job is on Greenhouse.
+    if (BOARDS && p === '/v1/api/jobs/in/search/1') {
+      if (url.searchParams.get('app_key') !== 'adzuna-e2e') return send(res, 401, { exception: 'AUTH_FAIL' });
+      return send(res, 200, { results: url.searchParams.get('where') ? [{
+        id: '777', title: 'Senior Talent Acquisition Partner', company: { display_name: 'Acme Cloud' }, location: { display_name: 'Bangalore, Karnataka' },
+        redirect_url: 'https://www.adzuna.in/details/777?utm_medium=api', created: new Date().toISOString(), description: 'Senior Talent Acquisition Partner for our Bengaluru GCC. 6+ years of tech hiring…',
+      }] : [] });
+    }
     // Greenhouse job API
     if (p === '/v1/boards/acmecloud/jobs/555') {
       return send(res, 200, {

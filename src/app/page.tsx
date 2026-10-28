@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {
-  ArrowRight, BellRing, ShieldCheck, CalendarClock, Flame, Handshake, Lightbulb, MessageSquareText, Radar, Send, Sparkles, Target, Trophy,
+  ArrowRight, BellRing, ShieldCheck, CalendarClock, Flame, Handshake, Lightbulb, MessageSquareText, Radar, Send, Sparkles, Target, Trophy, Wand2,
 } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { EmptyState, IconChip, Pill, Section, StatTile } from '@/components/kit';
@@ -29,16 +29,18 @@ export default async function Dashboard() {
   const todayStart = new Date(Math.floor((now.getTime() + IST) / DAY) * DAY - IST);
   const todayEnd = new Date(todayStart.getTime() + DAY);
   const since14 = new Date(todayStart.getTime() - 13 * DAY);
-  const [counts, profile, settings, fresh, followUps, staleApplied, appliedDates, sentDates, lastRun, outreachCount, approvals] = await Promise.all([
+  const [counts, profile, settings, top, fresh24, followUps, staleApplied, appliedDates, sentDates, lastRun, outreachCount, approvals] = await Promise.all([
     prisma.job.groupBy({ by: ['status'], _count: true }),
     loadProfile(),
     loadSettings(),
+    // The best open matches of the last two weeks, not just today's.
     prisma.job.findMany({
-      where: { status: 'NEW', firstSeenAt: { gte: new Date(now.getTime() - DAY) } },
+      where: { status: { in: ['NEW', 'SAVED'] }, firstSeenAt: { gte: new Date(now.getTime() - 14 * DAY) } },
       orderBy: [{ grillScore: { sort: 'desc', nulls: 'last' } }, { firstSeenAt: 'desc' }],
       take: 6,
       select: { id: true, title: true, company: true, location: true, grillScore: true, firstSeenAt: true, postedAt: true, source: true },
     }),
+    prisma.job.count({ where: { status: 'NEW', firstSeenAt: { gte: new Date(now.getTime() - DAY) } } }),
     prisma.outreach.findMany({
       where: { status: 'sent', followUpAt: { lt: todayEnd } },
       orderBy: { followUpAt: 'asc' },
@@ -166,29 +168,29 @@ export default async function Dashboard() {
       </Section>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="New jobs" value={n(['NEW'])} hint={`${fresh.length} in the last 24h`} icon={Flame} tone="danger" href="/jobs?view=new" />
+        <StatTile label="New jobs" value={n(['NEW'])} hint={`${fresh24} in the last 24h`} icon={Flame} tone="danger" href="/jobs?view=new" />
         <StatTile label="Applied" value={n(['APPLIED', 'INTERVIEW', 'OFFER'])} hint="all time" icon={Send} tone="primary" href="/pipeline" />
         <StatTile label="Interviews" value={n(['INTERVIEW'])} hint={n(['OFFER']) ? `${n(['OFFER'])} offer${n(['OFFER']) > 1 ? 's' : ''}` : 'keep going'} icon={Trophy} tone="warning" href="/pipeline" />
         <StatTile label="Outreach sent" value={outreachCount} hint={followUps.length + staleApplied.length ? `${followUps.length + staleApplied.length} follow-up${followUps.length + staleApplied.length > 1 ? 's' : ''} due` : 'none due'} icon={MessageSquareText} tone="info" href="/mailroom?tab=log" />
       </div>
 
       <div className="grid gap-8 md:grid-cols-[1.4fr_1fr]">
-        <Section title="Fresh in the last 24 hours" action={<Link href="/jobs?view=new&sort=score" className="text-sm font-medium text-info">All jobs</Link>}>
-          {fresh.length ? (
-            <div className="surface divide-y overflow-hidden">
-              {fresh.map((j) => (
-                <Link key={j.id} href={`/browser/${j.id}`} className="flex items-center gap-3 p-3 transition-colors hover:bg-accent/60">
+        <Section title="Your top matches" action={<Link href="/jobs?view=new&sort=score" className="text-sm font-medium text-primary">All {n(['NEW'])} jobs</Link>}>
+          {top.length ? (
+            <div className="surface divide-y overflow-hidden" data-testid="top-matches">
+              {top.map((j) => (
+                <div key={j.id} className="flex items-center gap-3 p-3">
                   <GrillScoreBadge score={j.grillScore} size="sm" />
-                  <div className="min-w-0 flex-1">
+                  <Link href={`/jobs/${j.id}`} className="min-w-0 flex-1">
                     <p className="truncate font-semibold leading-5">{j.title}</p>
-                    <p className="truncate text-sm text-muted-foreground">{j.company}{j.location ? ` · ${j.location}` : ''}</p>
-                  </div>
-                  <span className="meta shrink-0">{timeAgo(j.postedAt || j.firstSeenAt)}</span>
-                </Link>
+                    <p className="truncate text-sm text-muted-foreground">{j.company} · {timeAgo(j.postedAt || j.firstSeenAt)}</p>
+                  </Link>
+                  <Link href={`/apply/${j.id}`} className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full bg-primary px-3 text-[13px] text-primary-foreground active:scale-95"><Wand2 className="h-3.5 w-3.5" /> Apply</Link>
+                </div>
               ))}
             </div>
           ) : (
-            <EmptyState icon={Radar} title="Nothing new today yet" action={<Link href="/discover" className="text-sm font-medium text-info">Search in Discover</Link>}>
+            <EmptyState icon={Radar} title="No matches yet" action={<Link href="/discover" className="text-sm font-medium text-primary">Search in Discover</Link>}>
               The scanner checks company boards every morning at 8:00. Press Scan now for a fresh check.
             </EmptyState>
           )}

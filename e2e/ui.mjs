@@ -163,7 +163,8 @@ await shot('d07-job');
 ok('job page: Grill card with gauge, four dimensions, missing keywords, Generate resume');
 const jobUrl = page.url();
 await page.getByRole('tab', { name: 'Evaluate' }).click();
-await page.getByRole('button', { name: 'Run full evaluation' }).click();
+// Apply with AI may already have run the evaluation for this job.
+if (!(await page.getByTestId('eval-score').count())) await page.getByRole('button', { name: 'Run full evaluation' }).click();
 await page.getByTestId('eval-score').waitFor({ timeout: 60_000 });
 assert.equal(await page.getByTestId('eval-score').innerText(), '4.2');
 await page.getByText('Draft answers for the application form').waitFor();
@@ -277,19 +278,19 @@ await page.context().close();
 // ---------------- iPhone ----------------
 const phone = await open({ ...devices['iPhone 14'] });
 const pshot = (name) => phone.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
-for (const [path, name] of [['/', 'p00-home'], ['/discover', 'p01-discover'], ['/pipeline', 'p02-pipeline'], ['/browser', 'p03-browser'], [`/browser/${jobId}`, 'p04-browser-job'], ['/mailroom', 'p05-mailroom'], ['/jobs?view=all', 'p06-jobs'], ['/profile', 'p07-profile'], ['/settings', 'p08-settings'], ['__job__', 'p09-evaluation'], ['/insights', 'p10-insights']]) {
+for (const [path, name] of [['/', 'p00-home'], ['/discover', 'p01-discover'], ['/pipeline', 'p02-pipeline'], ['/browser', 'p03-browser'], [`/browser/${jobId}`, 'p04-browser-job'], ['/mailroom', 'p05-mailroom'], ['/jobs?view=all', 'p06-jobs'], ['/profile', 'p07-profile'], ['/settings', 'p08-settings'], ['__job__', 'p09-evaluation'], ['/insights', 'p10-insights'], ['/apply', 'p11-apply'], ['/more', 'p12-more']]) {
   await phone.goto(path === '__job__' ? jobUrl : BASE + path);
   await phone.waitForLoadState('networkidle');
   await noSideScroll(phone, `phone ${path}`);
   await pshot(name);
 }
 const tabs = phone.getByRole('navigation', { name: 'Tabs' });
-for (const label of ['Home', 'Discover', 'Pipeline', 'Browser', 'Mailroom']) await tabs.getByRole('link', { name: label }).waitFor();
+for (const label of ['Home', 'Jobs', 'Apply', 'Pipeline', 'More']) await tabs.getByRole('link', { name: label, exact: true }).waitFor();
 ok('iPhone: bottom tabs, every screen fits without sideways scroll');
 
 // A small Android-size phone: the same screens must still fit, tab bar included.
 const small = await open({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
-for (const path of ['/', '/discover', '/pipeline', '/browser', '/mailroom', '/jobs?view=all', '/profile', '/settings', '/insights']) {
+for (const path of ['/', '/discover', '/pipeline', '/browser', '/mailroom', '/jobs?view=all', '/profile', '/settings', '/insights', '/apply', '/more']) {
   await small.goto(BASE + path);
   await small.waitForLoadState('networkidle');
   await noSideScroll(small, `360px ${path}`);

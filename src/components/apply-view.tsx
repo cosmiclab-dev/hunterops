@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, ClipboardCheck, ExternalLink, FileText, Globe, Loader2, RefreshCw, ShieldCheck, Trash2, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -45,6 +46,7 @@ function Steps({ status }: { status: ApplicationRow['status'] | null }) {
 // One job's application: the AI prepares it, the person reviews and approves
 // it, then fills the company's own form and presses Submit there.
 export function ApplyView({ jobId, job }: { jobId: string; job: { title: string; company: string; url: string; grillScore: number | null } }) {
+  const router = useRouter();
   const [app, setApp] = useState<ApplicationRow | null | undefined>(undefined);
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
@@ -60,9 +62,9 @@ export function ApplyView({ jobId, job }: { jobId: string; job: { title: string;
   // While it is being prepared (here or by the morning run), check back every few seconds.
   useEffect(() => {
     if (app?.status !== 'PREPARING') return;
-    const t = setInterval(() => { load().catch(() => {}); }, 5000);
+    const t = setInterval(() => { load().then((a) => { if (a?.status !== 'PREPARING') router.refresh(); }).catch(() => {}); }, 5000);
     return () => clearInterval(t);
-  }, [app?.status, load]);
+  }, [app?.status, load, router]);
 
   async function run(label: string, fn: () => Promise<void>) {
     setBusy(label);
@@ -82,6 +84,7 @@ export function ApplyView({ jobId, job }: { jobId: string; job: { title: string;
       await api('/api/applications', { method: 'POST', json: { jobId } });
     } finally {
       await load();
+      router.refresh();
     }
     setEdits({});
     setLetter(null);
@@ -133,7 +136,7 @@ export function ApplyView({ jobId, job }: { jobId: string; job: { title: string;
               <IconChip icon={Wand2} tone="primary" />
               <div className="min-w-0">
                 <p className="font-semibold">Let the AI prepare this application</p>
-                <p className="text-sm leading-6 text-muted-foreground">It reads the form, answers every question from your profile, tailors your resume and writes a cover letter. Nothing is sent or submitted: you review it first.</p>
+                <p className="text-sm leading-6 text-muted-foreground">It reads the form, answers every question from your profile, tailors your resume, writes a cover letter and runs the Career-Ops evaluation. Nothing is sent or submitted: you review it first.</p>
               </div>
             </div>
             {status === 'FAILED' && app?.error && <p className="rounded-xl bg-warning/15 p-3 text-sm text-warning">Last try: {app.error}</p>}

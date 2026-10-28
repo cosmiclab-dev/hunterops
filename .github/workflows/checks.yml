@@ -31,3 +31,73 @@ jobs:
       - name: Real search engines, career sites, job boards and DNS
         run: npm run test:live
 
+
+  # The whole app on a fresh Postgres: 51 API checks, the screen checks on
+  # desktop and iPhone, then the tap-by-tap user journey. Outside sites are
+  # local stand-ins here, so a red run is always the app's fault.
+  e2e:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: pg, POSTGRES_DB: hunterops }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Browser for the screen checks
+        run: |
+          npm i --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium || npx playwright install chromium
+      - name: Test environment
+        run: |
+          cat > .env.e2e <<'ENV'
+          DATABASE_URL=postgresql://postgres:pg@localhost:5432/hunterops
+          DIRECT_URL=postgresql://postgres:pg@localhost:5432/hunterops
+          APP_SECRET=ci-only-secret-0123456789abcdef0123456789
+          APP_PASSWORD=letmein
+          CRON_SECRET=cronsecret
+          SMTP_HOST=127.0.0.1
+          SMTP_PORT=2525
+          ENV
+      - run: bash e2e/e2e.sh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: e2e-screens, path: /tmp/hunterops-shots, if-no-files-found: ignore }
+
+  # The user journey against the real internet: real boards, ATS pages and
+  # web search. Also runs every morning, so a site that changes shows up here.
+  e2e-live:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: pg, POSTGRES_DB: hunterops }
+        ports: ['5432:5432']
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Browser
+        run: |
+          npm i --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium || npx playwright install chromium
+      - name: Test environment
+        run: |
+          cat > .env.e2e <<'ENV'
+          DATABASE_URL=postgresql://postgres:pg@localhost:5432/hunterops
+          DIRECT_URL=postgresql://postgres:pg@localhost:5432/hunterops
+          APP_SECRET=ci-only-secret-0123456789abcdef0123456789
+          APP_PASSWORD=letmein
+          CRON_SECRET=cronsecret
+          ENV
+      - run: bash e2e/e2e-live.sh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: live-screens, path: /tmp/hunterops-shots, if-no-files-found: ignore }

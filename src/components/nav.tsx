@@ -2,25 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, Columns3, Globe, Home, Lightbulb, LogOut, Mail, Radar, Settings, UserRound } from 'lucide-react';
+import { LogOut, Radar, Settings } from 'lucide-react';
+import { MAIN, MORE, MORE_TAB, type Item } from '@/components/nav-items';
 import { ThemeButton } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
-
-type Item = { href: string; label: string; icon: typeof Home; match: (p: string) => boolean };
-
-const MAIN: Item[] = [
-  { href: '/', label: 'Home', icon: Home, match: (p) => p === '/' },
-  { href: '/discover', label: 'Discover', icon: Radar, match: (p) => p.startsWith('/discover') },
-  { href: '/pipeline', label: 'Pipeline', icon: Columns3, match: (p) => p.startsWith('/pipeline') },
-  { href: '/browser', label: 'Browser', icon: Globe, match: (p) => p.startsWith('/browser') },
-  { href: '/mailroom', label: 'Mailroom', icon: Mail, match: (p) => p.startsWith('/mailroom') || p.startsWith('/outreach') },
-];
-const MORE: Item[] = [
-  { href: '/jobs', label: 'All jobs', icon: Briefcase, match: (p) => p.startsWith('/jobs') },
-  { href: '/insights', label: 'Insights', icon: Lightbulb, match: (p) => p.startsWith('/insights') },
-  { href: '/profile', label: 'Profile', icon: UserRound, match: (p) => p.startsWith('/profile') },
-  { href: '/settings', label: 'Settings', icon: Settings, match: (p) => p.startsWith('/settings') },
-];
 
 export function Logo({ compact = false }: { compact?: boolean }) {
   return (
@@ -71,7 +56,7 @@ export function Nav() {
             {MAIN.map((i) => <SideLink key={i.href} item={i} pathname={pathname} />)}
           </div>
           <div className="flex flex-col gap-0.5">
-            <p className="label-caps px-3.5 pb-1.5">Library</p>
+            <p className="label-caps px-3.5 pb-1.5">Tools</p>
             {MORE.map((i) => <SideLink key={i.href} item={i} pathname={pathname} />)}
           </div>
         </nav>
@@ -86,24 +71,15 @@ export function Nav() {
       <header className="glass sticky top-0 z-40 border-b border-black/[0.06] pt-[env(safe-area-inset-top)] dark:border-white/[0.08] lg:hidden">
         <div className="flex h-12 items-center gap-2 px-4">
           <Link href="/" aria-label="HunterOps home"><Logo /></Link>
-          <div className="ml-auto flex items-center">
-            {MORE.map((i) => (
-              <Link
-                key={i.href}
-                href={i.href}
-                aria-label={i.label}
-                className={cn('inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors', i.match(pathname) ? 'text-primary' : 'text-foreground/70 hover:text-foreground')}
-              >
-                <i.icon className="h-[19px] w-[19px]" />
-              </Link>
-            ))}
-          </div>
+          <Link href="/settings" aria-label="Settings" className={cn('ml-auto inline-flex h-10 w-10 items-center justify-center rounded-full transition-colors', pathname.startsWith('/settings') ? 'text-primary' : 'text-foreground/70 hover:text-foreground')}>
+            <Settings className="h-[19px] w-[19px]" />
+          </Link>
         </div>
       </header>
       {/* Liquid Glass tab bar: a floating capsule above the home indicator. */}
       <nav className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(env(safe-area-inset-bottom),10px)] lg:hidden" aria-label="Tabs">
         <div className="glass-float mx-auto grid max-w-md grid-cols-5 rounded-full p-1.5">
-          {MAIN.map((i) => {
+          {[...MAIN, MORE_TAB].map((i) => {
             const on = i.match(pathname);
             return (
               <Link key={i.href} href={i.href} className={cn('flex h-[54px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-full transition-[transform,colors] active:scale-95', on ? 'bg-white/70 text-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.9),0_1px_3px_rgb(0_0_0/0.08)] dark:bg-white/[0.12] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.12)]' : 'text-foreground/75')} aria-current={on ? 'page' : undefined}>

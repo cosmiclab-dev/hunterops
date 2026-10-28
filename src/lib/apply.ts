@@ -14,6 +14,8 @@ import { loadSettings } from './settings';
 import { tailorResume } from './tailor';
 import { extraBanned } from './writer';
 import { clip } from './utils';
+import { findOriginalPosting, isAggregatorUrl } from './original-posting';
+import { evaluateJob } from './career-ops/evaluate-job';
 
 export type { Answer };
 
@@ -40,11 +42,25 @@ export async function prepareApplication(jobId: string, opts: { auto?: boolean }
   });
 
   try {
-    // The live form decides the questions; if the page cannot be read, the standard fields stand in.
+    // The live form decides the questions. A job board listing (Adzuna and the
+    // like) hides the employer's form, so the employer's own posting is found first.
+    const notes: string[] = [];
+    let formUrl = job.url;
+    if (isAggregatorUrl(job.url)) {
+      const original = await findOriginalPosting(job, settings);
+      if (original) {
+        formUrl = original.url;
+        notes.push(`Found the employer's own posting${original.via === 'search' ? ' with a web search' : ' on their careers board'}: the answers follow its real form.`);
+      } else {
+        notes.push(`This job came from ${new URL(job.url).hostname.replace(/^www\./, '')}, which hides the employer's form from apps, so these are the standard application questions. Open the listing to reach the form.`);
+      }
+    }
     let page: Awaited<ReturnType<typeof loadJobPage>> | null = null;
-    try {
-      page = await loadJobPage(job.url, job.companyRef);
-    } catch { /* keep going with what the job already has */ }
+    if (formUrl !== job.url || !isAggregatorUrl(job.url)) {
+      try {
+        page = await loadJobPage(formUrl, formUrl === job.url ? job.companyRef : null);
+      } catch { /* keep going with what the job already has */ }
+    }
     let description = job.description || '';
     if (page && page.description.length > description.length + 200) {
       description = page.description;
@@ -53,16 +69,21 @@ export async function prepareApplication(jobId: string, opts: { auto?: boolean }
     const role = job.title;
     const company = job.company;
 
-    const [sheet, resume, letter] = await Promise.allSettled([
+    // The Career-Ops A-H evaluation runs alongside, unless a recent one exists.
+    const recentEval = await prisma.report.findFirst({ where: { jobId, mode: 'evaluation', createdAt: { gte: new Date(Date.now() - 14 * 864e5) } }, select: { id: true } });
+    const [sheet, resume, letter, evaluation] = await Promise.allSettled([
       buildAnswerSheet(cfg, { fields: page?.fields?.length ? page.fields : STANDARD_FIELDS, profile, company, role, jd: description, extra }),
       tailorResume(cfg, { ...job, description }, profile, { density: 'standard', extra }),
       generateEmail(settings, { kind: 'cover_letter', framework: 'aida', profile, company, role, jd: description }),
+      recentEval ? Promise.resolve(null) : evaluateJob(jobId),
     ]);
     if (sheet.status === 'rejected') throw sheet.reason;
 
-    const notes: string[] = [];
-    if (!page) notes.push('The posting could not be opened, so these are the standard application questions.');
-    else if (!page.fields.length) notes.push('The form fields were not visible to the app, so these are the standard application questions.');
+    if (!isAggregatorUrl(job.url) || formUrl !== job.url) {
+      if (!page) notes.push('The posting could not be opened, so these are the standard application questions.');
+      else if (!page.fields.length) notes.push('The form fields were not visible to the app, so these are the standard application questions.');
+    }
+    if (evaluation.status === 'rejected') notes.push(`Career-Ops evaluation not run: ${(evaluation.reason as Error).message}`);
     if (resume.status === 'rejected') notes.push(`Resume not made: ${(resume.reason as Error).message}`);
     if (letter.status === 'rejected') notes.push(`Cover letter not written: ${(letter.reason as Error).message}`);
 
@@ -84,7 +105,7 @@ export async function prepareApplication(jobId: string, opts: { auto?: boolean }
         answers: answers as unknown as Prisma.InputJsonValue,
         resumeId,
         coverLetter,
-        applyUrl: page?.applyUrl || job.url,
+        applyUrl: page?.applyUrl || formUrl,
         embedUrl: page?.embedUrl || null,
         notes: notes as unknown as Prisma.InputJsonValue,
         error: null,

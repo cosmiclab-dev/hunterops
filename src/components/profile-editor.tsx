@@ -24,6 +24,9 @@ const COMPANY_TYPES = { gcc: 'GCC / MNC capability centre', product: 'Product co
 
 const SECTIONS = [['basics', 'Basics'], ['goals', 'What you want'], ['pay', 'Pay and notice'], ['where', 'Where you work'], ['skills', 'Skills and summary'], ['experience', 'Experience'], ['education', 'Education']] as const;
 
+// A pick list, so an empty box never looks filled in by its placeholder.
+const NOTICE = ['Immediate (0 days)', '15 days', '30 days', '45 days', '60 days', '90 days', 'Serving notice'];
+
 const lines = (s: string) => s.split('\n').map((x) => x.trim()).filter(Boolean);
 
 function Field({ label, id, hint, children }: { label: string; id: string; hint?: string; children: React.ReactNode }) {
@@ -173,7 +176,10 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
           <NumberInput id="current" value={p.currentCtcLpa} onValue={(n) => set('currentCtcLpa', n)} placeholder="18" />
         </Field>
         <Field label="Notice period" id="notice">
-          <Input id="notice" value={p.noticePeriod} onChange={(e) => set('noticePeriod', e.target.value)} placeholder="Immediate (0 days)" />
+          <select id="notice" value={p.noticePeriod} onChange={(e) => set('noticePeriod', e.target.value)} className="h-11 rounded-xl border border-input bg-card px-3.5" data-testid="notice">
+            <option value="">Choose…</option>
+            {[...NOTICE, ...(p.noticePeriod && !NOTICE.includes(p.noticePeriod) ? [p.noticePeriod] : [])].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
         </Field>
       </Card>
 

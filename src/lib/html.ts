@@ -159,5 +159,9 @@ export function formFields(html: string): FormField[] {
     fields.push({ key, label: label.slice(0, 300), type, required: el.hasAttribute('required') || el.getAttribute('aria-required') === 'true' || starred.has(id), options });
     if (fields.length >= 60) break;
   }
-  return fields;
+  // Only an application form counts: a site's country picker or search box is
+  // not one, and the standard questions do better than those.
+  return fields.some((f) => f.type === 'file' || APPLICATION_FIELD.test(`${f.key} ${f.label}`)) ? fields : [];
 }
+
+const APPLICATION_FIELD = /(?<![a-z])(e-?mail|first[\s_-]?name|last[\s_-]?name|full[\s_-]?name|your name|phone|mobile|resume|cv|linkedin|cover[\s_-]?letter)(?![a-z])/i;

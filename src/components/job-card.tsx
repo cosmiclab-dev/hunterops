@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Bookmark, BookmarkCheck, Building2, Clock3, ExternalLink, MapPin, X } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Building2, Clock3, ExternalLink, MapPin, Wand2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GrillScoreBadge } from '@/components/grill-score-badge';
 import { Pill } from '@/components/kit';
@@ -79,17 +79,17 @@ export function JobCard({ job }: { job: JobCardData }) {
         </div>
       )}
       <div className="mt-auto flex items-center gap-2 pt-1">
-        <Button asChild size="sm" variant="secondary" className="flex-1">
-          <Link href={`/jobs/${job.id}`}>Open</Link>
-        </Button>
-        <Button asChild size="sm" variant="outline" aria-label="Open the posting">
-          <a href={job.url} target="_blank" rel="noopener noreferrer"><ExternalLink /> Post</a>
+        <Button asChild size="sm" className="flex-1" data-testid="card-apply">
+          <Link href={`/apply/${job.id}`}><Wand2 /> Apply with AI</Link>
         </Button>
         {status === 'NEW' ? (
-          <Button size="sm" onClick={() => setJobStatus('SAVED')} disabled={busy} aria-label="Save"><Bookmark /> Save</Button>
+          <Button size="sm" variant="outline" onClick={() => setJobStatus('SAVED')} disabled={busy} aria-label="Save"><Bookmark /> Save</Button>
         ) : (
-          <Pill tone={STATUS_TONE[status] || 'muted'} className={cn('h-9 rounded-xl px-3 text-[15px] font-semibold capitalize')}>{status === 'SAVED' && <BookmarkCheck className="h-3.5 w-3.5" />}{status.toLowerCase()}</Pill>
+          <Pill tone={STATUS_TONE[status] || 'muted'} className={cn('h-9 rounded-full px-3 text-[14px] font-semibold capitalize')}>{status === 'SAVED' && <BookmarkCheck className="h-3.5 w-3.5" />}{status.toLowerCase()}</Pill>
         )}
+        <Button asChild size="icon-sm" variant="outline" className="h-9 w-9" aria-label="Open the original posting">
+          <a href={job.url} target="_blank" rel="noopener noreferrer"><ExternalLink /></a>
+        </Button>
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </article>
