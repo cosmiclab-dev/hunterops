@@ -18,6 +18,9 @@ const sql = (q) => execFileSync('psql', [process.env.DATABASE_URL, '-tAc', q]).t
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ ...devices['iPhone 14'], baseURL: BASE });
 const page = await ctx.newPage();
+// Keep the run on this machine: the Apply-form view frames the employer's real
+// form (Greenhouse), whose own scripts fail for a mock job and are not the app's.
+await ctx.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (r) => r.abort());
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 let n = 0;
