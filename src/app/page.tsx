@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {
-  ArrowRight, BellRing, Globe, Bookmark, Briefcase, CalendarClock, Columns3, Flame, Handshake, MessageSquareText, Radar, Send, Sparkles, Target, Trophy, UserRound,
+  ArrowRight, BellRing, CalendarClock, Flame, Handshake, Lightbulb, MessageSquareText, Radar, Send, Sparkles, Target, Trophy,
 } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { EmptyState, IconChip, PageHeader, Pill, Section, StatTile } from '@/components/kit';
@@ -113,6 +113,35 @@ export default async function Dashboard() {
         </div>
       </div>
 
+      <Section title="Do today">
+        {nudges ? (
+          <div className="surface divide-y overflow-hidden">
+            {followUps.map((f) => (
+              <Link key={f.id} href="/mailroom?tab=log" className="flex items-center gap-3 p-3 hover:bg-accent/60">
+                <IconChip icon={BellRing} tone="warning" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold leading-5">Follow up with {f.recipientName || f.recipientRole}</p>
+                  <p className="truncate text-sm text-muted-foreground">{f.company}</p>
+                </div>
+                <Pill tone={f.followUpAt && f.followUpAt < now ? 'danger' : 'warning'}>{f.followUpAt && f.followUpAt < now ? 'overdue' : 'today'}</Pill>
+              </Link>
+            ))}
+            {staleApplied.map((j) => (
+              <Link key={j.id} href={`/jobs/${j.id}`} className="flex items-center gap-3 p-3 hover:bg-accent/60">
+                <IconChip icon={CalendarClock} tone="info" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold leading-5">No reply from {j.company}</p>
+                  <p className="truncate text-sm text-muted-foreground">Applied {timeAgo(j.appliedAt)} · {j.title}</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground" />
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="surface p-4 text-sm text-muted-foreground">No follow-ups due. When you log a sent message, HunterOps reminds you after 5 days.</p>
+        )}
+      </Section>
+
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatTile label="New jobs" value={n(['NEW'])} hint={`${fresh.length} in the last 24h`} icon={Flame} tone="danger" href="/jobs?view=new" />
         <StatTile label="Applied" value={n(['APPLIED', 'INTERVIEW', 'OFFER'])} hint="all time" icon={Send} tone="primary" href="/pipeline" />
@@ -121,7 +150,7 @@ export default async function Dashboard() {
       </div>
 
       <div className="grid gap-8 md:grid-cols-[1.4fr_1fr]">
-        <Section title="Fresh in the last 24 hours" action={<Link href="/jobs?view=new&sort=score" className="text-sm font-semibold text-primary">All jobs</Link>}>
+        <Section title="Fresh in the last 24 hours" action={<Link href="/jobs?view=new&sort=score" className="text-sm font-medium text-info">All jobs</Link>}>
           {fresh.length ? (
             <div className="surface divide-y overflow-hidden">
               {fresh.map((j) => (
@@ -136,14 +165,14 @@ export default async function Dashboard() {
               ))}
             </div>
           ) : (
-            <EmptyState icon={Radar} title="Nothing new today yet" action={<Link href="/discover" className="text-sm font-semibold text-primary">Search in Discover</Link>}>
+            <EmptyState icon={Radar} title="Nothing new today yet" action={<Link href="/discover" className="text-sm font-medium text-info">Search in Discover</Link>}>
               The scanner checks company boards every morning at 8:00. Press Scan now for a fresh check.
             </EmptyState>
           )}
         </Section>
 
         <div className="flex flex-col gap-8">
-          <Section title="Pipeline" action={<Link href="/pipeline" className="text-sm font-semibold text-primary">Open board</Link>}>
+          <Section title="Pipeline" action={<Link href="/pipeline" className="text-sm font-medium text-info">Open board</Link>}>
             <div className="surface flex flex-col gap-4 p-4">
               <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
                 {pipeline.map((p) => p.value > 0 && <div key={p.label} className={p.tone} style={{ width: `${(p.value / pipeTotal) * 100}%` }} />)}
@@ -179,49 +208,16 @@ export default async function Dashboard() {
         </div>
       </div>
 
-      <Section title="Follow-ups due">
-        {nudges ? (
-          <div className="surface divide-y overflow-hidden">
-            {followUps.map((f) => (
-              <Link key={f.id} href="/mailroom?tab=log" className="flex items-center gap-3 p-3 hover:bg-accent/60">
-                <IconChip icon={BellRing} tone="warning" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold leading-5">Follow up with {f.recipientName || f.recipientRole}</p>
-                  <p className="truncate text-sm text-muted-foreground">{f.company}</p>
-                </div>
-                <Pill tone={f.followUpAt && f.followUpAt < now ? 'danger' : 'warning'}>{f.followUpAt && f.followUpAt < now ? 'overdue' : 'today'}</Pill>
-              </Link>
-            ))}
-            {staleApplied.map((j) => (
-              <Link key={j.id} href={`/jobs/${j.id}`} className="flex items-center gap-3 p-3 hover:bg-accent/60">
-                <IconChip icon={CalendarClock} tone="info" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold leading-5">No reply from {j.company}</p>
-                  <p className="truncate text-sm text-muted-foreground">Applied {timeAgo(j.appliedAt)} · {j.title}</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Nothing due. When you log a sent message, HunterOps reminds you to follow up after 5 days.</p>
-        )}
-      </Section>
-
-      <Section title="Quick actions">
+      <Section title="Shortcuts">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {[
-            { href: '/discover', icon: Radar, title: 'Discover', sub: '5 ATS, last 24h', tone: 'primary' as const },
-            { href: '/browser', icon: Globe, title: 'Browser', sub: 'Open, grill, auto-fill', tone: 'info' as const },
-            { href: '/mailroom?tab=linkedin', icon: Handshake, title: 'Write outreach', sub: '3 scripts, under 60 words', tone: 'info' as const },
-            { href: '/profile?tab=roast', icon: Sparkles, title: 'Roast my CV', sub: 'Duty to metric rewrite', tone: 'warning' as const },
-            { href: '/pipeline', icon: Columns3, title: 'Pipeline', sub: 'Move jobs through stages', tone: 'success' as const },
-            { href: '/jobs?view=saved', icon: Bookmark, title: 'Saved jobs', sub: `${n(['SAVED'])} waiting`, tone: 'muted' as const },
-            { href: '/mailroom?tab=gap', icon: Target, title: 'Gap scripts', sub: 'Email and phone screen', tone: 'muted' as const },
-            { href: '/profile', icon: UserRound, title: 'Profile', sub: profile?.skills.length ? `${profile.skills.length} skills` : 'Upload your CV', tone: 'muted' as const },
+            { href: '/mailroom?tab=linkedin', icon: Handshake, title: 'Write outreach', sub: 'LinkedIn and referral notes' },
+            { href: '/profile?tab=roast', icon: Sparkles, title: 'Roast my CV', sub: 'Turn duties into results' },
+            { href: '/insights', icon: Lightbulb, title: 'Insights', sub: 'Patterns, titles, skills' },
+            { href: '/mailroom?tab=gap', icon: Target, title: 'Gap answers', sub: 'For your career break' },
           ].map((a) => (
-            <Link key={a.href + a.title} href={a.href} className="surface flex flex-col gap-3 p-4 transition-colors hover:border-primary/40">
-              <IconChip icon={a.icon} tone={a.tone} />
+            <Link key={a.href} href={a.href} className="surface flex flex-col gap-3 p-4 transition-colors hover:bg-accent/60">
+              <IconChip icon={a.icon} />
               <div>
                 <p className="font-semibold leading-5">{a.title}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{a.sub}</p>

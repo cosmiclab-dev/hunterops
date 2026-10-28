@@ -72,19 +72,29 @@ export const EMAIL_FRAMEWORKS = {
 } as const;
 export type EmailFramework = keyof typeof EMAIL_FRAMEWORKS;
 
+export type WritingTone = 'warm' | 'formal' | 'direct';
+export const TONES: Record<WritingTone, string> = {
+  warm: 'warm and human, like a colleague writing, still professional.',
+  formal: 'formal and polite, suited to large enterprises and senior leaders.',
+  direct: 'direct and brief: the point in the first line, no pleasantries.',
+};
+
 export function emailMessages(a: {
   kind: EmailKind; framework: EmailFramework; profileText: string; company: string; role?: string; jd?: string;
   recipientName?: string; recipientTitle?: string; previous?: string; senderName?: string;
+  tone?: WritingTone; short?: boolean;
 }): ChatMessage[] {
   const first = a.recipientName ? a.recipientName.split(' ')[0] : '[Name]';
+  const words = a.kind === 'cover_letter' ? (a.short ? 150 : 200) : (a.short ? 80 : 120);
   const system = `You write job-search emails that busy recruiters answer. ${EMAIL_KINDS[a.kind]}
 
 Structure: ${EMAIL_FRAMEWORKS[a.framework]}
 
 Rules:
 - Subject: under 8 words, specific (role or company name), no clickbait.
-- Body: under ${a.kind === 'cover_letter' ? 200 : 120} words. Short paragraphs. One clear, small ask (a 10-minute call, a referral, the right contact).
+- Body: under ${words} words. Short paragraphs. One clear, small ask (a 10-minute call, a referral, the right contact).
 - Open with "Hi ${first}," and close with the candidate's first name only.
+- Tone: ${TONES[a.tone ?? 'warm']}
 - No "I hope this finds you well", no "I am writing to express", no emojis.
 - ${NO_FABRICATION}
 - ${antiSlopInstruction()}

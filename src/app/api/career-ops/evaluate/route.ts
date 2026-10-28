@@ -53,7 +53,7 @@ export const POST = route(async (req: Request) => {
 
   const { evaluation, model } = await runEvaluation(llmConfig(settings), {
     profileText: profileToText(profile!),
-    targets: [profile!.headline, ...targets].filter(Boolean),
+    targets: profile!.targetRoles.length ? profile!.targetRoles : [profile!.headline, ...targets].filter(Boolean),
     job: { title: job.title, company: job.company, location: job.location, salary: job.salary, url: job.url, description },
     grill, signals, research, storyTitles: stories.map((s) => s.title),
   });

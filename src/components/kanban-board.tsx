@@ -143,7 +143,7 @@ export function KanbanBoard({ initial }: { initial: KanbanJob[] }) {
 
   if (!jobs.length) {
     return (
-      <EmptyState icon={Columns3} title="Your pipeline is empty" action={<Link href="/discover" className="text-sm font-medium text-primary">Find jobs in Discover</Link>}>
+      <EmptyState icon={Columns3} title="Your pipeline is empty" action={<Link href="/discover" className="text-sm font-medium text-info">Find jobs in Discover</Link>}>
         Scanned jobs land in Scouted, strong matches in Grilled 75+. Save any job from Discover or the Browser.
       </EmptyState>
     );

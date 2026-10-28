@@ -145,6 +145,15 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
   );
 }
 
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <legend className="mb-2 text-xs font-medium text-muted-foreground">{title}</legend>
+      {children}
+    </fieldset>
+  );
+}
+
 // Unverified address guesses from the person's name; a tap fills the To field.
 function GuessEmail({ name, company, jobId, onPick }: { name: string; company: string; jobId?: string; onPick: (email: string) => void }) {
   const [res, setRes] = useState<{ guesses: string[]; note: string; mx: boolean } | null>(null);
@@ -163,7 +172,7 @@ function GuessEmail({ name, company, jobId, onPick }: { name: string; company: s
     }
   }
   return (
-    <div className="flex flex-col gap-2 md:col-span-2" data-testid="email-guess">
+    <div className="flex flex-col gap-2 sm:col-span-2" data-testid="email-guess">
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" size="sm" onClick={guess} disabled={busy || !name.trim()}>{busy ? 'Guessing…' : 'Guess their email'}</Button>
         {res && <Input aria-label="Company email domain" value={domain} onChange={(e) => setDomain(e.target.value)} placeholder="company.com (optional)" className="h-9 w-48" />}
@@ -211,52 +220,59 @@ export function EmailPanel({ jobId, initial, jobs }: { jobId?: string; initial: 
   const shown = emails.filter((e) => filter === 'all' || (filter === 'SENT' ? e.status === 'SENT' : e.status !== 'SENT'));
   return (
     <div className={picker ? 'grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]' : 'flex flex-col gap-4'}>
-      <form onSubmit={draft} className={picker ? 'surface flex flex-col gap-3 self-start p-4' : 'grid grid-cols-1 gap-3 md:grid-cols-2'} data-testid="email-compose">
-        {picker && <p className="text-sm font-semibold">New email</p>}
+      <form onSubmit={draft} className={picker ? 'surface flex flex-col gap-5 self-start p-4' : 'flex flex-col gap-5'} data-testid="email-compose">
+        {picker && <p className="text-[15px] font-semibold">New email</p>}
         {picker && (
+          <Group title="About">
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <Label htmlFor="em-job">Job</Label>
+              <select id="em-job" value={form.jobId} onChange={(e) => set('jobId')(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                <option value="">No job: type the company</option>
+                {jobs!.map((j) => <option key={j.id} value={j.id}>{j.company}: {j.title}</option>)}
+              </select>
+            </div>
+            {!form.jobId && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="em-company">Company</Label>
+                  <Input id="em-company" value={form.company} onChange={(e) => set('company')(e.target.value)} required />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="em-role">Role</Label>
+                  <Input id="em-role" value={form.role} onChange={(e) => set('role')(e.target.value)} placeholder="Senior Recruiter" />
+                </div>
+              </>
+            )}
+          </Group>
+        )}
+        <Group title="To">
           <div className="flex flex-col gap-1">
-            <Label htmlFor="em-job">Job</Label>
-            <select id="em-job" value={form.jobId} onChange={(e) => set('jobId')(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
-              <option value="">No job: type the company</option>
-              {jobs!.map((j) => <option key={j.id} value={j.id}>{j.company}: {j.title}</option>)}
-            </select>
+            <Label htmlFor="rname">Their name</Label>
+            <Input id="rname" value={form.recipientName} onChange={(e) => set('recipientName')(e.target.value)} />
           </div>
-        )}
-        {picker && !form.jobId && (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="em-company">Company</Label>
-              <Input id="em-company" value={form.company} onChange={(e) => set('company')(e.target.value)} required />
-            </div>
-            <div className="flex flex-col gap-1">
-              <Label htmlFor="em-role">Role</Label>
-              <Input id="em-role" value={form.role} onChange={(e) => set('role')(e.target.value)} placeholder="Senior Recruiter" />
-            </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="rtitle">Their title</Label>
+            <Input id="rtitle" value={form.recipientTitle} onChange={(e) => set('recipientTitle')(e.target.value)} placeholder="Head of Talent" />
           </div>
-        )}
-        <div className={picker ? 'flex flex-col gap-1' : 'flex flex-col gap-1 md:col-span-2'}>
-          <Label htmlFor="to">Recruiter email</Label>
-          <Input id="to" type="email" required value={form.toEmail} onChange={(e) => set('toEmail')(e.target.value)} placeholder="name@company.com" />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="rname">Their name</Label>
-          <Input id="rname" value={form.recipientName} onChange={(e) => set('recipientName')(e.target.value)} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="rtitle">Their title</Label>
-          <Input id="rtitle" value={form.recipientTitle} onChange={(e) => set('recipientTitle')(e.target.value)} placeholder="Head of Talent" />
-        </div>
-        <GuessEmail name={form.recipientName} company={form.company || jobs?.find((j) => j.id === form.jobId)?.company || ''} jobId={form.jobId || undefined} onPick={set('toEmail')} />
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="kind">Type</Label>
-          <Select id="kind" value={form.kind} onChange={set('kind')} options={KINDS} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <Label htmlFor="fw">Structure</Label>
-          <Select id="fw" value={form.framework} onChange={set('framework')} options={FRAMEWORKS} />
-        </div>
-        <Button type="submit" disabled={busy} className={picker ? '' : 'md:col-span-2'}>{busy ? 'Writing…' : 'Write draft'}</Button>
-        {err && <p className="text-sm text-destructive md:col-span-2" role="alert">{err}</p>}
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <Label htmlFor="to">Their email</Label>
+            <Input id="to" type="email" required value={form.toEmail} onChange={(e) => set('toEmail')(e.target.value)} placeholder="name@company.com" />
+          </div>
+          <GuessEmail name={form.recipientName} company={form.company || jobs?.find((j) => j.id === form.jobId)?.company || ''} jobId={form.jobId || undefined} onPick={set('toEmail')} />
+        </Group>
+        <Group title="Message">
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="kind">Type</Label>
+            <Select id="kind" value={form.kind} onChange={set('kind')} options={KINDS} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="fw">Structure</Label>
+            <Select id="fw" value={form.framework} onChange={set('framework')} options={FRAMEWORKS} />
+          </div>
+          <p className="meta sm:col-span-2">Tone, length and signature come from <a href="/settings#writing" className="text-info">Settings, Writing</a>.</p>
+        </Group>
+        <Button type="submit" disabled={busy}>{busy ? 'Writing…' : 'Write draft'}</Button>
+        {err && <p className="text-sm text-destructive" role="alert">{err}</p>}
       </form>
       <div className="flex min-w-0 flex-col gap-3">
         {picker && (

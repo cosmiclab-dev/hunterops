@@ -32,7 +32,14 @@ export type ProfileInput = ResumeData & {
   acceptRemote: boolean;
   acceptHybrid: boolean;
   onsiteCities: string[];
+  // What the person is aiming for; the Career-Ops evaluation scores fit against these.
+  targetRoles: string[];
+  dealbreakers: string[];
+  companyTypes: string[];
+  languages: string[];
 };
+
+export const COMPANY_TYPES = { gcc: 'GCC / MNC capability centre', product: 'Product company or startup', enterprise: 'Indian enterprise', services: 'IT services / consulting', staffing: 'Staffing or RPO firm' } as const;
 
 const asText = (v: unknown, max = 4000) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const asList = (v: unknown, max = 30, each = 600) =>
@@ -89,6 +96,10 @@ export function normalizeProfile(input: any = {}): ProfileInput {
     acceptRemote: input.acceptRemote !== false,
     acceptHybrid: input.acceptHybrid !== false,
     onsiteCities: asList(typeof input.onsiteCities === 'string' ? input.onsiteCities.split(',') : input.onsiteCities ?? ['Bengaluru'], 10, 60),
+    targetRoles: asList(input.targetRoles, 12, 80),
+    dealbreakers: asList(input.dealbreakers, 12, 200),
+    companyTypes: asList(input.companyTypes, 5, 20).filter((t) => t in COMPANY_TYPES),
+    languages: asList(input.languages, 8, 40),
   };
 }
 
@@ -114,8 +125,8 @@ export async function requireProfile() {
 
 export async function saveProfile(input: unknown) {
   const p = normalizeProfile(input);
-  const { experience, education, certifications, achievements, expectedSalaryLpa, currentCtcLpa, noticePeriod, ...cols } = p;
-  const data = { experience, education, certifications, achievements, expectedSalaryLpa, currentCtcLpa, noticePeriod };
+  const { experience, education, certifications, achievements, expectedSalaryLpa, currentCtcLpa, noticePeriod, targetRoles, dealbreakers, companyTypes, languages, ...cols } = p;
+  const data = { experience, education, certifications, achievements, expectedSalaryLpa, currentCtcLpa, noticePeriod, targetRoles, dealbreakers, companyTypes, languages };
   await prisma.profile.upsert({
     where: { id: 1 },
     create: { id: 1, ...cols, data },
@@ -152,5 +163,9 @@ export function profileToText(p: Partial<ProfileInput>) {
   for (const ed of p.education || []) lines.push(`Education: ${[ed.degree, ed.school, ed.end].filter(Boolean).join(', ')}`);
   if (p.certifications?.length) lines.push(`Certifications: ${p.certifications.join('; ')}`);
   if (p.achievements?.length) lines.push(`Achievements: ${p.achievements.join('; ')}`);
+  if (p.languages?.length) lines.push(`Languages: ${p.languages.join(', ')}`);
+  if (p.targetRoles?.length) lines.push(`Target roles: ${p.targetRoles.join(', ')}`);
+  if (p.companyTypes?.length) lines.push(`Preferred employers: ${p.companyTypes.map((t) => COMPANY_TYPES[t as keyof typeof COMPANY_TYPES] || t).join(', ')}`);
+  if (p.dealbreakers?.length) lines.push(`Dealbreakers (treat as red flags): ${p.dealbreakers.join('; ')}`);
   return lines.join('\n');
 }

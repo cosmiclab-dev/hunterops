@@ -8,7 +8,7 @@ import { api, download } from '@/lib/api-client';
 import { grillBand, type GrillResult } from '@/lib/modules/grill';
 import { cn } from '@/lib/utils';
 
-const BAND_STROKE = { red: '#DC2626', yellow: '#CA8A04', green: '#16A34A' } as const;
+const BAND_STROKE = { red: '#C9343E', yellow: '#B7791F', green: '#2F8A4C' } as const;
 const BAND_TEXT = { red: 'text-grill-red', yellow: 'text-grill-yellow', green: 'text-grill-green' } as const;
 const BAND_LABEL = { red: 'Weak match', yellow: 'Possible match', green: 'Strong match' } as const;
 

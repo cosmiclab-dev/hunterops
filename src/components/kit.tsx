@@ -6,7 +6,7 @@ export function PageHeader({ eyebrow, title, sub, action, className }: { eyebrow
   return (
     <div className={cn('flex items-start justify-between gap-4', className)}>
       <div className="min-w-0">
-        {eyebrow && <p className="label-caps text-primary">{eyebrow}</p>}
+        {eyebrow && <p className="label-caps text-muted-foreground">{eyebrow}</p>}
         <h1 className="page-title mt-1">{title}</h1>
         {sub && <p className="mt-1 text-sm leading-6 text-muted-foreground">{sub}</p>}
       </div>
@@ -16,7 +16,7 @@ export function PageHeader({ eyebrow, title, sub, action, className }: { eyebrow
 }
 
 const TONES = {
-  primary: 'bg-primary/10 text-primary',
+  primary: 'bg-muted text-foreground',
   success: 'bg-success/10 text-success',
   warning: 'bg-warning/15 text-warning',
   info: 'bg-info/10 text-info',
@@ -25,9 +25,10 @@ const TONES = {
 } as const;
 export type Tone = keyof typeof TONES;
 
+// Icons sit on a quiet grey tile; colour is kept for status (danger) only.
 export function IconChip({ icon: Icon, tone = 'primary', className }: { icon: LucideIcon; tone?: Tone; className?: string }) {
   return (
-    <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl', TONES[tone], className)}>
+    <span className={cn('grid h-9 w-9 shrink-0 place-items-center rounded-xl', tone === 'danger' ? TONES.danger : 'bg-muted text-foreground/80', className)}>
       <Icon className="h-[18px] w-[18px]" />
     </span>
   );
@@ -35,12 +36,12 @@ export function IconChip({ icon: Icon, tone = 'primary', className }: { icon: Lu
 
 export function StatTile({ label, value, hint, icon, tone = 'primary', href }: { label: string; value: React.ReactNode; hint?: React.ReactNode; icon: LucideIcon; tone?: Tone; href?: string }) {
   const body = (
-    <div className="surface flex h-full flex-col gap-3 p-4 transition-colors hover:border-primary/40">
+    <div className="surface flex h-full flex-col gap-3 p-4 transition-colors hover:border-foreground/20">
       <div className="flex items-center justify-between">
         <span className="text-[13px] font-medium text-muted-foreground">{label}</span>
         <IconChip icon={icon} tone={tone} className="h-8 w-8 rounded-lg" />
       </div>
-      <div className="text-[30px] font-extrabold leading-none tracking-tight tabular-nums">{value}</div>
+      <div className="text-[30px] font-semibold leading-none tracking-[-0.02em] tabular-nums">{value}</div>
       {hint && <div className="meta">{hint}</div>}
     </div>
   );
