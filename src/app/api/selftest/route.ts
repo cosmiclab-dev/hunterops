@@ -8,7 +8,7 @@ import { loadProfile, profileIsEmpty } from '@/lib/profile';
 import { ATS_FETCHERS, BOARD_FETCHERS, type CompanyRow, type Posting, type ScanCtx } from '@/lib/scan/sources';
 import { SEED_COMPANIES } from '@/lib/scan/seed-companies';
 import { loadSettings } from '@/lib/settings';
-import { bingSearch, duckSearch } from '@/lib/websearch';
+import { bingSearch, duckSearch, searchConfig, SEARCH_PROVIDERS, webSearch } from '@/lib/websearch';
 import { crawlerFrom, testCrawler } from '@/lib/crawl4ai';
 
 export const dynamic = 'force-dynamic';
@@ -57,6 +57,10 @@ export const POST = route(async () => {
     run(`ats-${t}`, 'Company career sites', `${t[0].toUpperCase()}${t.slice(1)} (${companies[t].name})`, async () => {
       const jobs = await ATS_FETCHERS[t](companies[t], ctx);
       if (t === 'greenhouse') greenhouseJobs = jobs;
+      // Workday and SmartRecruiters are searched for "recruiter"; the others list every role.
+      if (t === 'workday' || t === 'smartrecruiters') {
+        return jobs.length ? `${jobs.length} recruiter roles found.` : 'Connected. No recruiter roles open there right now.';
+      }
       return `${jobs.length} open roles read.`;
     }));
 
@@ -102,16 +106,31 @@ export const POST = route(async () => {
       if (!crawler) throw new Skip('Not set up. Optional: add your Crawl4AI server in Settings, Job search.');
       return testCrawler(crawler);
     }),
-    run('search-bing', 'Free web search', 'Bing', async () => {
-      const r = await bingSearch('recruiter Bengaluru site:boards.greenhouse.io', 'w', 10);
-      if (!r.length) throw new Error('Answered, but with no results.');
-      return `${r.length} results.`;
-    }),
-    run('search-ddg', 'Free web search', 'DuckDuckGo', async () => {
-      const r = await duckSearch('recruiter Bengaluru site:boards.greenhouse.io', 'w');
-      if (!r.length) throw new Error('Answered, but with no results.');
-      return `${r.length} results.`;
-    }),
+    ...(() => {
+      const cfg = searchConfig(settings);
+      if (cfg.provider !== 'free') {
+        return [run('search-api', 'Web search', SEARCH_PROVIDERS[cfg.provider].label, async () => {
+          if (!cfg.key) throw new Error('Paste your API key in Settings, Web search.');
+          const r = await webSearch(cfg, 'recruiter Bengaluru site:boards.greenhouse.io', 'w', 10);
+          if (!r.length) throw new Error('Answered, but with no results.');
+          return `${r.length} results.`;
+        })];
+      }
+      // Free engines often refuse cloud servers; point to the fix rather than just failing.
+      const tip = ' Bing and DuckDuckGo often refuse cloud servers. Get a free Serper key and pick Serper in Settings, Web search.';
+      return [
+        run('search-bing', 'Web search', 'Bing (free)', async () => {
+          const r = await bingSearch('recruiter Bengaluru site:boards.greenhouse.io', 'w', 10).catch((e) => { throw new Error(e.message + tip); });
+          if (!r.length) throw new Error('Answered, but with no results.' + tip);
+          return `${r.length} results.`;
+        }),
+        run('search-ddg', 'Web search', 'DuckDuckGo (free)', async () => {
+          const r = await duckSearch('recruiter Bengaluru site:boards.greenhouse.io', 'w').catch((e) => { throw new Error(e.message + tip); });
+          if (!r.length) throw new Error('Answered, but with no results.' + tip);
+          return `${r.length} results.`;
+        }),
+      ];
+    })(),
     run('gmail', 'Email', 'Gmail sign-in', async () => {
       const user = settings.get('smtp_user');
       const pass = settings.get('smtp_app_password');

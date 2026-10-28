@@ -70,7 +70,7 @@ export function JobCard({ job }: { job: JobCardData }) {
         <span className="inline-flex min-w-0 items-center gap-1"><MapPin className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{[job.location, MODE_LABEL[job.workMode]].filter(Boolean).join(' · ') || 'Location not stated'}</span></span>
         <span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" />{timeAgo(job.postedAt || job.firstSeenAt)}</span>
         {fresh && <Pill tone="danger" className="px-2 py-0 text-[10px] uppercase tracking-wide">Fresh</Pill>}
-        <span className="ml-auto font-mono text-[10px] uppercase tracking-wider">{job.source}</span>
+        <span className="capitalize">{job.source}</span>
       </div>
       {(job.matched.length > 0 || job.missing.length > 0) && (
         <div className="flex flex-wrap gap-1.5">
@@ -88,7 +88,7 @@ export function JobCard({ job }: { job: JobCardData }) {
         {status === 'NEW' ? (
           <Button size="sm" onClick={() => setJobStatus('SAVED')} disabled={busy} aria-label="Save"><Bookmark /> Save</Button>
         ) : (
-          <Pill tone={STATUS_TONE[status] || 'muted'} className={cn('h-9 px-3 capitalize')}>{status === 'SAVED' && <BookmarkCheck className="h-3.5 w-3.5" />}{status.toLowerCase()}</Pill>
+          <Pill tone={STATUS_TONE[status] || 'muted'} className={cn('h-9 rounded-xl px-3 text-[15px] font-semibold capitalize')}>{status === 'SAVED' && <BookmarkCheck className="h-3.5 w-3.5" />}{status.toLowerCase()}</Pill>
         )}
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}

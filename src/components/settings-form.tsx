@@ -334,13 +334,13 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         <Button className="self-start" onClick={saveFeed}>Save</Button>
         <Status {...feedMsg} />
       </Section>
-      <Section title="Web search" id="search" desc="Used by Discover, company research and contact finding. The free option needs no key: Bing’s public results, then DuckDuckGo. A key only gives steadier results.">
+      <Section title="Web search" id="search" desc="Used by Discover, company research and contact finding. Bing and DuckDuckGo often refuse requests from cloud servers like Vercel, so a free Serper key (serper.dev, 2,500 searches) is the reliable choice.">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1">
             <Label htmlFor="sprov">Search source</Label>
             <select id="sprov" value={search.provider} onChange={(e) => setSearch({ ...search, provider: e.target.value })} className="h-11 rounded-xl border border-input bg-card px-3.5">
-              <option value="free">Free: Bing + DuckDuckGo (no key)</option>
-              <option value="serper">Serper (Google results, key)</option>
+              <option value="serper">Serper (Google results, free key)</option>
+              <option value="free">Bing + DuckDuckGo (no key, often refused)</option>
               <option value="brave">Brave Search API (key)</option>
             </select>
           </div>

@@ -26,7 +26,7 @@ export default async function PipelinePage() {
   }));
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Pipeline" sub="Drag cards between columns. Grilled 75+ holds the strong matches; Applied tracks interviews and offers." action={<ScanButton />} />
+      <PageHeader title="Pipeline" sub="Drag a card, or use Move to, as a job moves forward." action={<ScanButton />} />
       <KanbanBoard initial={jobs} />
     </div>
   );

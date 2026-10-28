@@ -3,15 +3,17 @@ import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function PageHeader({ eyebrow, title, sub, action, className }: { eyebrow?: string; title: string; sub?: React.ReactNode; action?: React.ReactNode; className?: string }) {
+  // On phones a compact action shares the first line (eyebrow, else title), like an iOS toolbar button.
   return (
-    // On phones the action sits above the large title, like an iOS toolbar button.
-    <div className={cn('flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4', className)}>
-      <div className="min-w-0">
-        {eyebrow && <p className="label-caps text-muted-foreground">{eyebrow}</p>}
-        <h1 className="page-title mt-1">{title}</h1>
-        {sub && <p className="mt-2 max-w-2xl text-[15px] leading-[1.47] text-muted-foreground sm:text-[17px]">{sub}</p>}
-      </div>
-      {action && <div className="order-first shrink-0 self-end sm:order-last sm:self-auto">{action}</div>}
+    <div className={cn('grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 sm:gap-x-4', className)}>
+      {eyebrow && <p className="label-caps col-start-1 row-start-1 text-muted-foreground">{eyebrow}</p>}
+      <h1 className={cn('page-title min-w-0', eyebrow ? 'col-span-2 mt-1 sm:col-span-1' : 'col-start-1 row-start-1')}>{title}</h1>
+      {sub && <p className="col-span-2 mt-2 max-w-2xl text-[15px] leading-[1.47] text-muted-foreground sm:col-span-1 sm:text-[17px]">{sub}</p>}
+      {action && (
+        <div className="col-start-2 row-start-1 shrink-0 max-sm:[&_button]:h-9 max-sm:[&_button]:px-3.5 max-sm:[&_button]:text-[15px] sm:row-span-3 sm:self-start">
+          {action}
+        </div>
+      )}
     </div>
   );
 }

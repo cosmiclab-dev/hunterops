@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor, closestCorners, useDraggable, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
-import { Columns3, FileText, Globe, GripVertical, MessageSquareText } from 'lucide-react';
+import { Clock3, Columns3, FileText, Globe, GripVertical, MessageSquareText } from 'lucide-react';
 import { GrillScoreBadge } from '@/components/grill-score-badge';
 import { EmptyState } from '@/components/kit';
 import { api } from '@/lib/api-client';
@@ -21,9 +21,9 @@ export type KanbanJob = {
 const APPLIED_STAGES = [['APPLIED', 'Applied'], ['INTERVIEW', 'Interview'], ['OFFER', 'Offer']] as const;
 const DOT: Record<ColumnId, string> = { scouted: 'bg-info', grilled: 'bg-grill-green', applied: 'bg-primary', rejected: 'bg-muted-foreground' };
 
-function CardBody({ j, onStage, dragging }: { j: KanbanJob; onStage?: (s: string) => void; dragging?: boolean }) {
+function CardBody({ j, onStage, dragging, move }: { j: KanbanJob; onStage?: (s: string) => void; dragging?: boolean; move?: ReactNode }) {
   return (
-    <div className={cn('flex flex-col gap-2.5 rounded-lg border bg-card p-3 shadow-sm', dragging && 'rotate-1 shadow-lg ring-2 ring-primary/40')}>
+    <div className={cn('flex flex-col gap-2.5 rounded-2xl border bg-card p-3.5 shadow-sm', dragging && 'rotate-1 shadow-lg ring-2 ring-primary/40')}>
       <div className="flex items-start gap-2.5">
         <GrillScoreBadge score={j.grillScore} size="sm" />
         <div className="min-w-0 flex-1">
@@ -33,17 +33,18 @@ function CardBody({ j, onStage, dragging }: { j: KanbanJob; onStage?: (s: string
         <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
       </div>
       <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-        <span>{j.appliedAt ? `Applied ${timeAgo(j.appliedAt)}` : `Updated ${timeAgo(j.updatedAt)}`}</span>
+        <span className="inline-flex min-w-0 items-center gap-1 whitespace-nowrap"><Clock3 className="h-3 w-3 shrink-0" />{j.appliedAt ? `Applied ${timeAgo(j.appliedAt)}` : timeAgo(j.updatedAt)}</span>
         {j.touches > 0 && <span className="inline-flex items-center gap-1"><MessageSquareText className="h-3 w-3" />{j.touches}</span>}
         {j.resumes > 0 && <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />{j.resumes}</span>}
         <Link href={`/browser/${j.id}`} className="ml-auto inline-flex items-center gap-1 hover:text-foreground" onPointerDown={(e) => e.stopPropagation()} aria-label={`Open ${j.title} in Browser`}>
           <Globe className="h-3 w-3" /> Open
         </Link>
+        {move}
       </div>
       {onStage && (
-        <div className="inline-flex rounded-md border p-0.5" onPointerDown={(e) => e.stopPropagation()}>
+        <div className="inline-flex rounded-[10px] bg-muted p-0.5" onPointerDown={(e) => e.stopPropagation()}>
           {APPLIED_STAGES.map(([id, label]) => (
-            <button key={id} type="button" onClick={() => onStage(id)} className={cn('flex-1 rounded px-2 py-1 text-[11px] font-medium', j.status === id ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+            <button key={id} type="button" onClick={() => onStage(id)} className={cn('flex-1 rounded-lg px-2 py-1 text-xs font-semibold', j.status === id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
               {label}
             </button>
           ))}
@@ -57,16 +58,21 @@ function Card({ j, onStage, onMove }: { j: KanbanJob; onStage: (s: string) => vo
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: j.id });
   const col = columnOf(j);
   return (
-    <article ref={setNodeRef} {...listeners} {...attributes} className={cn('touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg', isDragging && 'opacity-30')} data-testid="kanban-card" data-job={j.id}>
-      <CardBody j={j} onStage={col === 'applied' ? onStage : undefined} />
-      {/* Phones and keyboards: move without dragging. */}
-      <label className="mt-1 block lg:sr-only" onPointerDown={(e) => e.stopPropagation()}>
-        <span className="sr-only">Move {j.title}</span>
-        <select value="" onChange={(e) => e.target.value && onMove(e.target.value as ColumnId)} className="h-7 w-full rounded-md border bg-background px-2 text-xs text-muted-foreground">
-          <option value="" disabled>Move to…</option>
-          {COLUMNS.filter((c) => c.id !== col).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-        </select>
-      </label>
+    <article ref={setNodeRef} {...listeners} {...attributes} className={cn('touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-2xl', isDragging && 'opacity-30')} data-testid="kanban-card" data-job={j.id}>
+      <CardBody
+        j={j}
+        onStage={col === 'applied' ? onStage : undefined}
+        move={
+          // Phones and keyboards: move without dragging.
+          <label className="lg:sr-only" onPointerDown={(e) => e.stopPropagation()}>
+            <span className="sr-only">Move {j.title}</span>
+            <select value="" onChange={(e) => e.target.value && onMove(e.target.value as ColumnId)} className="select-compact h-7 rounded-full bg-primary/10 pl-2.5 text-xs font-semibold text-primary">
+              <option value="" disabled>Move to…</option>
+              {COLUMNS.filter((c) => c.id !== col).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            </select>
+          </label>
+        }
+      />
     </article>
   );
 }

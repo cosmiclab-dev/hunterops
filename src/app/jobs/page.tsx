@@ -89,27 +89,25 @@ export default async function JobBoard({ searchParams }: { searchParams: Search 
         </Link>
       )}
 
-      <div className="scroll-x">
-        <div className="inline-flex gap-1 rounded-full border bg-muted p-1" role="tablist" aria-label="Status">
+      <div className="grid w-full max-w-md grid-cols-4 gap-0.5 rounded-[11px] bg-muted p-0.5" role="tablist" aria-label="Status">
           {(Object.keys(VIEWS) as (keyof typeof VIEWS)[]).map((v) => (
             <Link
               key={v}
               href={href(cur, { view: v })}
               role="tab"
               aria-selected={v === view}
-              className={cn('inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-4 text-sm font-semibold text-muted-foreground transition-colors', v === view && 'bg-card text-foreground shadow-sm')}
+              className={cn('inline-flex h-8 items-center justify-center gap-1 whitespace-nowrap rounded-[9px] px-1 text-[13px] font-semibold text-muted-foreground transition-colors', v === view && 'bg-card text-foreground shadow-sm')}
             >
-              {VIEWS[v].label} <span className={cn('rounded-full px-1.5 text-xs tabular-nums', v === view ? 'bg-primary text-primary-foreground' : 'bg-background')}>{tabCounts[v]}</span>
+              {VIEWS[v].label} <span className="text-[11px] font-medium tabular-nums text-muted-foreground">{tabCounts[v]}</span>
             </Link>
           ))}
-        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="scroll-x flex items-center gap-2 md:flex-wrap">
         {(Object.keys(LOCS) as (keyof typeof LOCS)[]).map((l) => (
           <Link key={l} href={href(cur, { loc: l })} className="chip" data-on={l === loc}>{LOCS[l].label}</Link>
         ))}
-        <span className="mx-1 h-5 w-px bg-border" />
+        <span className="mx-1 h-5 w-px shrink-0 bg-border" />
         {(Object.keys(SORTS) as (keyof typeof SORTS)[]).map((s) => (
           <Link key={s} href={href(cur, { sort: s })} className="chip" data-on={s === sort}>{SORTS[s]}</Link>
         ))}

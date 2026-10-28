@@ -1,5 +1,6 @@
 'use client';
 
+import { CheckCircle2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -126,10 +127,10 @@ export function ModesPanel({ scope, jobId, initial, feed = '' }: { scope: 'job' 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Tool">
         {modes.map((m) => (
           <button key={m} type="button" role="radio" aria-checked={m === mode} onClick={() => { setMode(m); setErr(''); }}
-            className={cn('rounded-xl border p-3 text-left transition-colors', m === mode ? 'border-foreground bg-muted/60' : 'border-border hover:bg-muted/40')}>
+            className={cn('rounded-2xl border bg-card p-3.5 text-left transition-[transform,colors] active:scale-[0.98]', m === mode ? 'border-primary bg-primary/[0.06] ring-1 ring-primary' : 'border-border hover:bg-muted/40')}>
             <span className="flex items-center justify-between gap-2 text-sm font-semibold">
               {MODE_META[m].label}
-              {reports.some((r) => r.mode === m) && <span className="text-xs font-normal text-muted-foreground">done</span>}
+              {reports.some((r) => r.mode === m) && <span className="inline-flex items-center gap-1 text-xs font-medium text-success"><CheckCircle2 className="h-3.5 w-3.5" />Has a result</span>}
             </span>
             <span className="mt-1 block text-xs leading-5 text-muted-foreground">{MODE_META[m].blurb}</span>
           </button>

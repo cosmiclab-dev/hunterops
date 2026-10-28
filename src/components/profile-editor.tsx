@@ -1,5 +1,6 @@
 'use client';
 
+import { IconChip } from '@/components/kit';
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { Plus, Trash2, Upload } from 'lucide-react';
@@ -111,11 +112,11 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
   return (
     <div className="flex flex-col gap-5">
       <section className="surface flex flex-col gap-3 p-4 md:p-5">
-        <div className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-muted"><Upload className="h-5 w-5" /></span>
-          <div>
+        <div className="flex items-start gap-3">
+          <IconChip icon={Upload} tone="primary" />
+          <div className="min-w-0">
             <h2 className="text-[15px] font-semibold">Import your resume</h2>
-            <p className="text-sm leading-5 text-muted-foreground">PDF, DOCX or TXT. AI reads it into the fields below; nothing is saved until you press Save.</p>
+            <p className="text-sm leading-5 text-muted-foreground">PDF, DOCX or TXT. AI fills in the fields below. Nothing saves until you tap Save.</p>
           </div>
         </div>
         <input ref={file} type="file" accept=".pdf,.docx,.txt,.md" className="hidden" onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} data-testid="resume-file" />
