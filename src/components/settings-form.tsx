@@ -47,7 +47,7 @@ export const SETTINGS_GROUPS = [
 function Group({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
     <div id={`g-${id}`} className="flex scroll-mt-24 flex-col gap-3">
-      <h2 className="px-1 text-xs font-medium text-muted-foreground">{title}</h2>
+      <h2 className="px-4 text-[13px] uppercase tracking-[0.02em] text-muted-foreground">{title}</h2>
       {children}
     </div>
   );
@@ -265,7 +265,7 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
       <Section title="AI model" desc="Writes your emails, evaluations and prep. Default: OpenCode Go with DeepSeek. Any provider works the same way: pick it, paste a key, pick a model.">
         <div className="flex flex-col gap-1">
           <Label htmlFor="provider">Provider</Label>
-          <select id="provider" value={provider} onChange={(e) => { setProvider(e.target.value); setModel(''); setKey(''); }} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+          <select id="provider" value={provider} onChange={(e) => { setProvider(e.target.value); setModel(''); setKey(''); }} className="h-11 rounded-xl border border-input bg-card px-3.5">
             {Object.entries(providers).map(([id, p]) => <option key={id} value={id}>{p.label}</option>)}
           </select>
         </div>
@@ -338,7 +338,7 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1">
             <Label htmlFor="sprov">Search source</Label>
-            <select id="sprov" value={search.provider} onChange={(e) => setSearch({ ...search, provider: e.target.value })} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+            <select id="sprov" value={search.provider} onChange={(e) => setSearch({ ...search, provider: e.target.value })} className="h-11 rounded-xl border border-input bg-card px-3.5">
               <option value="free">Free: Bing + DuckDuckGo (no key)</option>
               <option value="serper">Serper (Google results, key)</option>
               <option value="brave">Brave Search API (key)</option>
@@ -377,7 +377,7 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1">
             <Label htmlFor="tone">Tone</Label>
-            <select id="tone" value={writing.tone} onChange={(e) => setWriting({ ...writing, tone: e.target.value })} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+            <select id="tone" value={writing.tone} onChange={(e) => setWriting({ ...writing, tone: e.target.value })} className="h-11 rounded-xl border border-input bg-card px-3.5">
               <option value="warm">Warm: like a colleague</option>
               <option value="formal">Formal: large companies, senior leaders</option>
               <option value="direct">Direct: the point first, no pleasantries</option>
@@ -385,7 +385,7 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
           </div>
           <div className="flex flex-col gap-1">
             <Label htmlFor="elen">Length</Label>
-            <select id="elen" value={writing.length} onChange={(e) => setWriting({ ...writing, length: e.target.value })} className="h-10 rounded-md border border-input bg-background px-3 text-sm">
+            <select id="elen" value={writing.length} onChange={(e) => setWriting({ ...writing, length: e.target.value })} className="h-11 rounded-xl border border-input bg-card px-3.5">
               <option value="standard">Standard (up to 120 words)</option>
               <option value="short">Short (up to 80 words)</option>
             </select>

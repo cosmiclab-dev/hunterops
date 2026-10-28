@@ -10,7 +10,7 @@ const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
 >(({ className, ...props }, ref) => (
-  <TabsPrimitive.List ref={ref} className={cn('inline-flex h-11 items-center gap-1 rounded-full border bg-muted p-1', className)} {...props} />
+  <TabsPrimitive.List ref={ref} className={cn('inline-flex h-10 items-center gap-0.5 rounded-full bg-muted p-1', className)} {...props} />
 ));
 TabsList.displayName = TabsPrimitive.List.displayName;
 
@@ -21,7 +21,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 text-sm font-semibold text-muted-foreground transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm [&_svg]:size-4',
+      'inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3.5 text-sm font-medium text-muted-foreground transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-[0_1px_3px_rgb(0_0_0/0.1)] [&_svg]:size-4',
       className,
     )}
     {...props}

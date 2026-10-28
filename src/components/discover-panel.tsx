@@ -135,17 +135,17 @@ export function DiscoverPanel() {
 
       {/* Results */}
       <section className="flex min-w-0 flex-col gap-4">
-        <div className="flex items-center gap-1 border-b" role="tablist">
+        <div className="scroll-x"><div className="flex w-max min-w-full items-center gap-1 border-b" role="tablist">
           {tabs.map((t) => (
             <button
               key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => (t.id === 'people' && res && !res.people.length && res.webEnabled ? search(true) : setTab(t.id))}
-              className={cn('-mb-px inline-flex h-10 items-center gap-2 border-b-2 px-3 text-sm font-medium transition-colors', tab === t.id ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
+              className={cn('-mb-px inline-flex h-11 shrink-0 items-center gap-2 border-b-2 px-3 text-[15px] transition-colors', tab === t.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}
             >
               <t.icon className="h-4 w-4" /> {t.label}
               {t.n !== null && <span className="rounded bg-muted px-1.5 text-xs tabular-nums">{t.n}</span>}
             </button>
           ))}
-        </div>
+        </div></div>
         {err && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{err}</p>}
         {res?.errors.length ? <p className="text-xs text-muted-foreground">Some searches failed: {res.errors.join(' ')}</p> : null}
         {!res && busy && <SkeletonRows />}

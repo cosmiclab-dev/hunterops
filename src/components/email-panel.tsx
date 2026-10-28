@@ -23,7 +23,7 @@ const FRAMEWORKS = { aida: 'AIDA (Attention, Interest, Desire, Action)', pas: 'P
 
 function Select({ value, onChange, options, id }: { value: string; onChange: (v: string) => void; options: Record<string, string>; id: string }) {
   return (
-    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+    <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-full rounded-xl border border-input bg-card px-3.5">
       {Object.entries(options).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
     </select>
   );
@@ -148,7 +148,7 @@ function Draft({ email, onChange }: { email: EmailRow; onChange: (e: EmailRow | 
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <fieldset className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <legend className="mb-2 text-xs font-medium text-muted-foreground">{title}</legend>
+      <legend className="mb-2 text-[13px] uppercase tracking-[0.02em] text-muted-foreground">{title}</legend>
       {children}
     </fieldset>
   );
@@ -226,7 +226,7 @@ export function EmailPanel({ jobId, initial, jobs }: { jobId?: string; initial: 
           <Group title="About">
             <div className="flex flex-col gap-1 sm:col-span-2">
               <Label htmlFor="em-job">Job</Label>
-              <select id="em-job" value={form.jobId} onChange={(e) => set('jobId')(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <select id="em-job" value={form.jobId} onChange={(e) => set('jobId')(e.target.value)} className="h-11 w-full rounded-xl border border-input bg-card px-3.5">
                 <option value="">No job: type the company</option>
                 {jobs!.map((j) => <option key={j.id} value={j.id}>{j.company}: {j.title}</option>)}
               </select>
