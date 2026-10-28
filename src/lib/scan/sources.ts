@@ -101,7 +101,8 @@ async function lever(c: CompanyRow): Promise<Posting[]> {
       remote: j.workplaceType === 'remote' || /remote/i.test(locs.join(' ')),
       url: j.hostedUrl,
       posted_at: iso(j.createdAt),
-      description: clip(j.descriptionPlain || htmlToText(j.description), 20000),
+      // The requirements and responsibilities live in `lists`, not the description.
+      description: clip(htmlToText(`${j.description || ''}${(j.lists || []).map((l: Json) => `<h3>${l.text}</h3><ul>${l.content}</ul>`).join('')}${j.additional || ''}`) || j.descriptionPlain || '', 20000),
       salary: j.salaryRange ? money(j.salaryRange.min, j.salaryRange.max, j.salaryRange.currency) : null,
     };
   });

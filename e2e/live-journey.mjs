@@ -95,7 +95,7 @@ await step('the Jobs tab lists them', async () => {
 });
 
 await step('Apply with AI on a real Greenhouse, Lever or Ashby job reads its real application form', async () => {
-  const row = sql("SELECT id || '|' || title || '|' || company FROM jobs WHERE source IN ('greenhouse', 'lever', 'ashby') AND url NOT LIKE '%gh_jid%' ORDER BY grill_score DESC NULLS LAST LIMIT 1");
+  const row = sql("SELECT id || '|' || title || '|' || company FROM jobs WHERE source IN ('greenhouse', 'lever', 'ashby') AND url NOT LIKE '%gh_jid%' AND length(description) >= 400 ORDER BY grill_score DESC NULLS LAST LIMIT 1");
   if (!row) return 'no Greenhouse, Lever or Ashby job in today’s scan: skipped';
   const [id, title, company] = row.split('|');
   await page.goto(`/apply/${id}`);
