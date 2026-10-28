@@ -534,6 +534,48 @@ await step('Career-Ops evaluation: liveness, repost and pay signals, A-H report,
   assert.ok(html.includes('Worth applying this week'));
 });
 
+await step('Career-Ops modes: job prep tools, offer disclaimer, 300-char notes, reply and titles actions, stats', async () => {
+  const prep = await call('POST', '/api/career-ops/run', { mode: 'interview_prep', jobId: ghJob.id });
+  assert.equal(prep.status, 200, JSON.stringify(prep.data));
+  assert.equal(prep.data.report.data.sections[0].heading, 'Main');
+  const contacts = await call('POST', '/api/career-ops/run', { mode: 'contacts', jobId: ghJob.id });
+  const note = contacts.data.report.data.sections[0].items.find((i) => i.copy);
+  assert.match(note.tag, /\/300 characters/);
+  assert.equal((await call('POST', '/api/career-ops/run', { mode: 'offer_review', jobId: ghJob.id, input: 'short' })).status, 400);
+  const offer = await call('POST', '/api/career-ops/run', { mode: 'offer_review', jobId: ghJob.id, input: 'Offer letter. Fixed CTC 24 LPA. Notice period 90 days. Variable at sole discretion.' });
+  assert.equal(offer.data.report.data.sections.at(-1).heading, 'Disclaimer');
+  assert.equal((await call('POST', '/api/career-ops/run', { mode: 'negotiate' })).status, 400, 'job modes need a job');
+  await call('PATCH', `/api/jobs/${ghJob.id}`, { status: 'APPLIED' });
+  const reply = await call('POST', '/api/career-ops/run', { mode: 'reply', input: 'Hi Divya, thanks for applying to Acme Cloud. Can we schedule a 30 minute call on Friday?' });
+  assert.equal(reply.status, 200, JSON.stringify(reply.data));
+  const act = reply.data.report.data.actions[0];
+  assert.equal(act.kind, 'set_status');
+  assert.equal(act.status, 'INTERVIEW');
+  await call('PATCH', `/api/jobs/${ghJob.id}`, { status: 'SAVED' });
+  const titles = await call('POST', '/api/career-ops/run', { mode: 'titles' });
+  assert.deepEqual(titles.data.report.data.actions[0].titles, ['Talent Partner', 'TA Business Partner']);
+  const pat = await call('POST', '/api/career-ops/run', { mode: 'patterns' });
+  assert.equal(pat.data.report.data.sections[0].heading, 'Funnel');
+  const up = await call('POST', '/api/career-ops/run', { mode: 'upskill' });
+  assert.match(up.data.report.data.sections[0].heading, /Gap heatmap/);
+  const list = await call('GET', `/api/career-ops/run?jobId=${ghJob.id}`);
+  assert.ok(list.data.reports.length >= 3);
+  const html = await (await call('GET', '/insights', undefined, { raw: true })).text();
+  assert.ok(html.includes('Story bank'));
+});
+
+await step('Story bank: evaluation stories listed; add, check and delete by hand', async () => {
+  const before = (await call('GET', '/api/stories')).data.stories;
+  assert.ok(before.some((s) => s.title === 'Hiring 120 engineers in 12 months' && !s.verified));
+  const add = await call('POST', '/api/stories', { title: 'Fixing offer drop-offs', action: 'Called every offered candidate weekly until joining.', result: 'Drop-offs fell [X]%.' });
+  assert.equal(add.status, 201);
+  assert.equal(add.data.story.verified, true);
+  const ai = before.find((s) => !s.verified);
+  assert.equal((await call('PATCH', `/api/stories/${ai.id}`, { verified: true })).data.story.verified, true);
+  assert.equal((await call('DELETE', `/api/stories/${add.data.story.id}`)).status, 200);
+  assert.equal((await call('POST', '/api/stories', { title: 'x' })).status, 400);
+});
+
 await step('Pipeline columns: Scouted, Grilled 75+, Applied, Rejected', async () => {
   const res = await call('GET', '/pipeline', undefined, { raw: true });
   assert.equal(res.status, 200);

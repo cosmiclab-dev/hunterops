@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Briefcase, Columns3, Globe, Home, LogOut, Mail, Radar, Settings, UserRound } from 'lucide-react';
+import { Briefcase, Columns3, Globe, Home, Lightbulb, LogOut, Mail, Radar, Settings, UserRound } from 'lucide-react';
 import { ThemeButton } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
 
@@ -17,6 +17,7 @@ const MAIN: Item[] = [
 ];
 const MORE: Item[] = [
   { href: '/jobs', label: 'All jobs', icon: Briefcase, match: (p) => p.startsWith('/jobs') },
+  { href: '/insights', label: 'Insights', icon: Lightbulb, match: (p) => p.startsWith('/insights') },
   { href: '/profile', label: 'Profile', icon: UserRound, match: (p) => p.startsWith('/profile') },
   { href: '/settings', label: 'Settings', icon: Settings, match: (p) => p.startsWith('/settings') },
 ];
