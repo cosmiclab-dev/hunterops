@@ -32,7 +32,7 @@ export default async function BrowserPage({ searchParams }: { searchParams: { ur
   );
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-8">
-      <PageHeader title="Browser" sub="Open any job posting inside HunterOps: read it, score it, auto-fill the application answers and generate a resume, side by side." />
+      <PageHeader title="Browser" sub="Open a posting, score it, and get your answers and resume ready." />
       <div className="surface flex flex-col gap-3 p-5">
         <div className="flex items-center gap-2 text-sm font-semibold"><Globe className="h-4 w-4" /> Open a job link</div>
         <OpenLinkForm />

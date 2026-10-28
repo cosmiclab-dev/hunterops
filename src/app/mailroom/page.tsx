@@ -23,7 +23,7 @@ export default async function MailroomPage({ searchParams }: { searchParams: { t
   const tab = MAILROOM_TABS.includes(searchParams.tab || '') ? searchParams.tab! : jobId ? 'linkedin' : 'email';
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Mailroom" sub="Recruiter emails (AIDA or PAS) that you approve before they send, LinkedIn and referral messages, gap answers, follow-ups, and a plain-English editor." />
+      <PageHeader title="Mailroom" sub="Emails, LinkedIn notes and follow-ups. Nothing sends until you approve it." />
       <Mailroom
         initialTab={tab}
         job={job}

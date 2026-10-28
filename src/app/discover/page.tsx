@@ -6,7 +6,7 @@ export default function DiscoverPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Discover"
-        sub="Catch postings on company ATS boards hours before they reach LinkedIn, and find the people hiring."
+        sub="Find new postings before they reach LinkedIn, and the people hiring."
       />
       <DiscoverPanel />
     </div>
