@@ -41,5 +41,6 @@ export const POST = route(async (req: Request) => {
     grill,
     job: existing ? { id: existing.id, status: existing.status, grillScore: grill?.score ?? existing.grillScore } : null,
     autofill: existing?.artifact?.autofill ?? null,
+    coverLetter: existing?.artifact?.coverLetterText ?? null,
   });
 });

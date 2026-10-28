@@ -129,7 +129,9 @@ await panel.getByTestId('answer').filter({ hasText: 'First Name' }).getByText('D
 await panel.getByTestId('answer').filter({ hasText: 'Why do you want to join' }).getByText(/Capgemini/).waitFor();
 await shot('d04-browser-autofill');
 await panel.getByRole('tab', { name: 'Cover letter' }).click();
-await panel.getByRole('button', { name: 'Write cover letter' }).click();
+// The letter saved earlier for this job shows up; Write again replaces it.
+await panel.getByTestId('cover-letter').getByRole('textbox', { name: 'Cover letter' }).waitFor();
+await panel.getByRole('button', { name: 'Write again' }).click();
 await panel.getByTestId('cover-letter').getByRole('button', { name: 'Plain English' }).waitFor();
 await shot('d05-browser-cover');
 ok('browser: reader view (no scripts), Analyze gauge, Auto-fill sheet, cover letter');

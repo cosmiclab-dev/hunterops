@@ -43,6 +43,7 @@ export const SETTINGS: Record<string, Def> = {
   crawl4ai_token: { label: 'Page reader token', secret: true, env: 'CRAWL4AI_TOKEN' },
   boards_scanned_at: { label: 'Boards last scanned', internal: true },
   seed_version: { label: 'Starter boards version', internal: true },
+  login_lock: { label: 'Wrong passwords in a row', internal: true },
 };
 
 export type SettingKey = keyof typeof SETTINGS;

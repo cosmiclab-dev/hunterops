@@ -119,7 +119,7 @@ describe('CV reading without AI', () => {
 
 describe('Module A guard', () => {
   it('scanForSlop returns findings, with custom words from Settings', () => {
-    expect(scanForSlop('We delve into the landscape.')).toEqual({ hasSlop: true, findings: ['delve', 'landscape'] });
+    expect(scanForSlop('We delve into the landscape.')).toEqual({ hasSlop: true, findings: ['delve into', 'landscape'] });
     const extra = parseExtraBanned('Synergy, leverage\npassionate, x');
     expect(extra).toEqual(['synergy', 'leverage', 'passionate']);
     expect(scanSlop('Passionate about synergy.', extra).hits.map((h) => h.phrase)).toEqual(['passionate', 'synergy']);

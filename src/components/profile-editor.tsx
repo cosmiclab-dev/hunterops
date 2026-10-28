@@ -69,6 +69,7 @@ export function ProfileEditor({ initial }: { initial: ProfileInput | null }) {
       const { draft, model, chars, warning } = await api<{ draft: ProfileInput; model: string | null; chars: number; warning: string | null }>('/api/profile/import', { method: 'POST', body: form });
       setP({ ...draft, acceptRemote: p.acceptRemote, acceptHybrid: p.acceptHybrid, onsiteCities: p.onsiteCities, expectedSalaryLpa: p.expectedSalaryLpa, currentCtcLpa: p.currentCtcLpa, noticePeriod: p.noticePeriod });
       setSkillsText(draft.skills.join(', '));
+      setLangsText((draft.languages ?? []).join(', '));
       setRev((r) => r + 1);
       setMsg(warning || `Read ${chars.toLocaleString()} characters with ${model}. Check everything below, then Save.`);
     } catch (e) {

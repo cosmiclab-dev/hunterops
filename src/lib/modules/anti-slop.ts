@@ -34,24 +34,45 @@ type Rule = {
   // A plainer replacement, or null when the honest fix is to cut the phrase
   // and state the concrete fact instead.
   replacement: string | null;
+  // The swap for each word form, so the grammar still fits ("navigated" to
+  // "handled"). A rule with swaps only swaps the forms listed here.
+  swaps?: Record<string, string>;
   why: string;
 };
 
+// A capitalised match in the middle of a sentence is a name ("BrightView
+// Landscape Services", "Navigate Health"), not filler.
+function isNameAt(src: string, index: number) {
+  if (!/^[A-Z]/.test(src[index] || '')) return false;
+  const before = src.slice(0, index).replace(/[\s"'“‘(\[]+$/, '');
+  return before.length > 0 && !/[.!?:;\n•\-–—]$/.test(before);
+}
+
 export const RULES: Record<BannedPhrase, Rule> = {
-  delve: { forms: ['delve', 'delves', 'delved', 'delving'], replacement: 'dig into', why: 'Say what you examined.' },
-  'testament to': { forms: ['testament to', 'a testament to'], replacement: 'shows', why: 'State the evidence directly.' },
+  delve: {
+    forms: ['delve into', 'delves into', 'delved into', 'delving into', 'delve', 'delves', 'delved', 'delving'],
+    replacement: 'look at',
+    swaps: { 'delve into': 'look at', 'delves into': 'looks at', 'delved into': 'looked at', 'delving into': 'looking at', delve: 'dig', delves: 'digs', delved: 'dug', delving: 'digging' },
+    why: 'Say what you examined.',
+  },
+  'testament to': {
+    forms: ['is a testament to', 'are a testament to', 'was a testament to', 'a testament to', 'testament to'],
+    replacement: 'shows',
+    swaps: { 'is a testament to': 'shows', 'are a testament to': 'show', 'was a testament to': 'showed' },
+    why: 'State the evidence directly.',
+  },
   'game-changer': { forms: ['game-changer', 'game changer', 'game-changers', 'game changers', 'game-changing', 'game changing'], replacement: null, why: 'Name the change and its result instead.' },
-  landscape: { forms: ['landscape', 'landscapes'], replacement: 'market', why: 'Name the actual market, field or team.' },
-  fostering: { forms: ['foster', 'fosters', 'fostered', 'fostering'], replacement: 'building', why: 'Say what you built and how.' },
+  landscape: { forms: ['landscape', 'landscapes'], replacement: 'market', swaps: { landscape: 'market', landscapes: 'markets' }, why: 'Name the actual market, field or team.' },
+  fostering: { forms: ['foster', 'fosters', 'fostered', 'fostering'], replacement: 'build', swaps: { foster: 'build', fosters: 'builds', fostered: 'built', fostering: 'building' }, why: 'Say what you built and how.' },
   tapestry: { forms: ['tapestry', 'tapestries'], replacement: null, why: 'Decorative filler; cut it.' },
-  plethora: { forms: ['plethora', 'a plethora of'], replacement: 'many', why: 'Give the number if you have it.' },
-  underscores: { forms: ['underscore', 'underscores', 'underscored', 'underscoring'], replacement: 'shows', why: 'Plain verbs read faster.' },
+  plethora: { forms: ['a plethora of', 'plethora of', 'plethora'], replacement: 'many', swaps: { 'a plethora of': 'many', 'plethora of': 'many' }, why: 'Give the number if you have it.' },
+  underscores: { forms: ['underscore', 'underscores', 'underscored', 'underscoring'], replacement: 'shows', swaps: { underscore: 'show', underscores: 'shows', underscored: 'showed', underscoring: 'showing' }, why: 'Plain verbs read faster.' },
   paramount: { forms: ['paramount'], replacement: 'essential', why: 'Overstated; say why it matters.' },
-  spearheaded: { forms: ['spearhead', 'spearheads', 'spearheaded', 'spearheading'], replacement: 'led', why: '"Led" is shorter and recruiters scan for it.' },
+  spearheaded: { forms: ['spearhead', 'spearheads', 'spearheaded', 'spearheading'], replacement: 'led', swaps: { spearhead: 'lead', spearheads: 'leads', spearheaded: 'led', spearheading: 'leading' }, why: '"Led" is shorter and recruiters scan for it.' },
   unwavering: { forms: ['unwavering'], replacement: null, why: 'Unprovable adjective; cut it and show the result.' },
   'digital age': { forms: ['digital age', "today's digital age", 'in the digital age'], replacement: null, why: 'Says nothing; cut it.' },
-  meticulous: { forms: ['meticulous', 'meticulously'], replacement: 'careful', why: 'Show the accuracy with a number instead.' },
-  navigating: { forms: ['navigate', 'navigates', 'navigated', 'navigating'], replacement: 'handling', why: 'Say what you handled.' },
+  meticulous: { forms: ['meticulous', 'meticulously'], replacement: 'careful', swaps: { meticulous: 'careful', meticulously: 'carefully' }, why: 'Show the accuracy with a number instead.' },
+  navigating: { forms: ['navigate', 'navigates', 'navigated', 'navigating'], replacement: 'handle', swaps: { navigate: 'handle', navigates: 'handles', navigated: 'handled', navigating: 'handling' }, why: 'Say what you handled.' },
   'poised to': { forms: ['poised to'], replacement: 'set to', why: 'Plainer and less salesy.' },
   'rich history': { forms: ['rich history', 'a rich history'], replacement: null, why: 'State the fact: founded in, years, scale.' },
 };
@@ -114,6 +135,10 @@ export function scanSlop(text: string, extra: string[] = []): SlopReport {
     re.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(src))) {
+      if (isNameAt(src, m.index)) continue;
+      const swaps = (rule as Rule).swaps;
+      const form = m[0].toLowerCase().replace(/[\s-]+/g, ' ');
+      const replacement = swaps ? swaps[form] ?? swaps[form.replace(/ /g, '-')] ?? null : rule.replacement;
       const start = Math.max(0, m.index - 40);
       const end = Math.min(src.length, m.index + m[0].length + 40);
       hits.push({
@@ -121,7 +146,7 @@ export function scanSlop(text: string, extra: string[] = []): SlopReport {
         match: m[0],
         index: m.index,
         length: m[0].length,
-        replacement: rule.replacement,
+        replacement,
         why: rule.why,
         context: `${start > 0 ? '…' : ''}${src.slice(start, end).replace(/\s+/g, ' ')}${end < src.length ? '…' : ''}`,
       });

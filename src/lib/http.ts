@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ZodError } from 'zod';
+import { withBudget } from './budget';
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -13,7 +14,7 @@ export const ok = (data: unknown, status = 200) => NextResponse.json(data, { sta
 export function route<A extends unknown[]>(fn: (...args: A) => Promise<Response>) {
   return async (...args: A) => {
     try {
-      return await fn(...args);
+      return await withBudget(() => fn(...args));
     } catch (err) {
       if (err instanceof HttpError) return NextResponse.json({ error: err.message }, { status: err.status });
       if (err instanceof ZodError) {

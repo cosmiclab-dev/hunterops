@@ -72,13 +72,18 @@ async function loadFonts(pdf: PDFDocument) {
 
 // The Latin subsets cover English text; swap common symbols they lack and drop the rest.
 const SWAPS: Record<string, string> = { '₹': 'Rs ', '→': '->', '←': '<-', '✓': '-', '≥': '>=', '≤': '<=', ' ': ' ', '\t': ' ' };
+// Letters with no decomposed form, for fonts that lack them.
+const FOLD: Record<string, string> = { 'Ł': 'L', 'ł': 'l', 'Ø': 'O', 'ø': 'o', 'Đ': 'D', 'đ': 'd', 'ß': 'ss', 'Æ': 'AE', 'æ': 'ae', 'Œ': 'OE', 'œ': 'oe', 'ı': 'i' };
 function safeText(font: PDFFont, text: string) {
   const fk = (font as any).embedder?.font;
   let out = '';
   for (const ch of String(text || '').replace(/[\r\n]+/g, ' ')) {
     const c = SWAPS[ch] ?? ch;
     if (fk?.hasGlyphForCodePoint) {
-      out += [...c].every((x) => fk.hasGlyphForCodePoint(x.codePointAt(0))) ? c : '';
+      const has = (t: string) => [...t].every((x) => fk.hasGlyphForCodePoint(x.codePointAt(0)));
+      // A letter the font lacks ("Ł") falls back to its plain form ("L") instead of vanishing.
+      const plain = (FOLD[c] ?? c.normalize('NFKD').replace(/[\u0300-\u036f]/g, ''));
+      out += has(c) ? c : plain && has(plain) ? plain : '';
     } else {
       try {
         font.encodeText(c);
@@ -150,12 +155,14 @@ export async function renderPdf(r: ResumeData, density: Density = 'standard'): P
     ensure(leading);
     const rt = safeText(f.mono, right);
     const rw = f.mono.widthOfTextAtSize(rt, T.meta.size);
-    const lt = wrap(left, lf, size, colW - rw - 12)[0] || '';
+    // A long title wraps under itself; the dates stay on the first line.
+    const [first = '', ...rest] = wrap(left, lf, size, colW - rw - 12);
     stats.baselines.push(cursor);
     const baseline = H - M - cursor - Math.round(leading * 0.5 + size * 0.35);
-    page.drawText(lt, { x: M, y: baseline, size, font: lf, color: ink });
+    page.drawText(first, { x: M, y: baseline, size, font: lf, color: ink });
     if (rt) page.drawText(rt, { x: M + colW - rw, y: baseline, size: T.meta.size, font: f.mono, color: ink });
     cursor += leading;
+    if (rest.length) for (const ln of wrap(rest.join(' '), lf, size, colW - rw - 12)) setLine(ln, lf, size, leading);
   };
 
   // Header: name, headline, mono contact line. Flush left.

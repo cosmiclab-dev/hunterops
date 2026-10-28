@@ -4,6 +4,7 @@
 // never saved: "Draft rejected due to low-quality AI patterns: [words]."
 import { chatJson, type ChatMessage, type LlmConfig } from './llm/client';
 import { HttpError } from './http';
+import { timeLeft } from './budget';
 import type { Settings } from './settings';
 import { applySafeFixes, parseExtraBanned, rewriteRequest, scanForSlop, scanSlop, slopRejection, textOf, type SlopReport } from './modules/anti-slop';
 
@@ -32,7 +33,8 @@ export async function writeClean<T = any>(
   let data = first.data as T;
   let slop: SlopReport = scan(data);
   let rewrites = 0;
-  if (!slop.clean) {
+  // A rewrite needs time for a second full answer; past that, the swaps below do the job.
+  if (!slop.clean && timeLeft() > 90_000) {
     try {
       const second = await chatJson(cfg, [
         ...messages,

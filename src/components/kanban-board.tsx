@@ -133,13 +133,14 @@ export function KanbanBoard({ initial }: { initial: KanbanJob[] }) {
   }, [jobs]);
 
   async function setStatus(id: string, status: string) {
-    const prev = jobs;
+    const before = jobs.find((j) => j.id === id);
     const now = new Date().toISOString();
     setJobs((js) => js.map((j) => (j.id === id ? { ...j, status, updatedAt: now, appliedAt: status === 'APPLIED' && !j.appliedAt ? now : j.appliedAt } : j)));
     try {
       await api(`/api/jobs/${id}`, { method: 'PATCH', json: { status } });
     } catch (e) {
-      setJobs(prev);
+      // Put back only the card that failed, so a later move is kept.
+      if (before) setJobs((js) => js.map((j) => (j.id === id ? before : j)));
       setMsg((e as Error).message);
     }
   }

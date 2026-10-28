@@ -24,7 +24,11 @@ function istDayKey(d: Date) {
 
 export default async function Dashboard() {
   const now = new Date();
-  const since14 = new Date(now.getTime() - 13 * DAY);
+  // Day boundaries are Indian time, wherever the server runs.
+  const IST = 5.5 * 3600_000;
+  const todayStart = new Date(Math.floor((now.getTime() + IST) / DAY) * DAY - IST);
+  const todayEnd = new Date(todayStart.getTime() + DAY);
+  const since14 = new Date(todayStart.getTime() - 13 * DAY);
   const [counts, profile, settings, fresh, followUps, staleApplied, appliedDates, sentDates, lastRun, outreachCount, approvals] = await Promise.all([
     prisma.job.groupBy({ by: ['status'], _count: true }),
     loadProfile(),
@@ -36,7 +40,7 @@ export default async function Dashboard() {
       select: { id: true, title: true, company: true, location: true, grillScore: true, firstSeenAt: true, postedAt: true, source: true },
     }),
     prisma.outreach.findMany({
-      where: { status: 'sent', followUpAt: { lte: new Date(now.getTime() + DAY) } },
+      where: { status: 'sent', followUpAt: { lt: todayEnd } },
       orderBy: { followUpAt: 'asc' },
       take: 5,
       select: { id: true, company: true, recipientRole: true, recipientName: true, followUpAt: true },

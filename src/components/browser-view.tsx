@@ -18,7 +18,7 @@ type Page = {
 };
 type Answer = { key: string; label: string; type: string; required: boolean; value: string; source: 'profile' | 'ai' | 'you'; note?: string };
 type Sheet = { answers: Answer[]; generic: boolean; model: string | null };
-type Opened = { page: Page; grill: GrillResult | null; job: { id: string; status: string; grillScore: number | null } | null; autofill: Sheet | null };
+type Opened = { page: Page; grill: GrillResult | null; job: { id: string; status: string; grillScore: number | null } | null; autofill: Sheet | null; coverLetter?: string | null };
 
 type View = 'reader' | 'live' | 'apply';
 type Tool = 'analyze' | 'autofill' | 'resume' | 'email';
@@ -191,7 +191,7 @@ export function BrowserView({ jobId: initialJobId, url, initialView }: { jobId?:
         </Button>
       </div>
 
-      <div className={cn('grid min-h-0 flex-1', panel ? 'lg:grid-cols-[minmax(0,1fr)_400px]' : 'lg:grid-cols-1')}>
+      <div className={cn('grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)]', panel ? 'lg:grid-cols-[minmax(0,1fr)_400px]' : 'lg:grid-cols-1')}>
         {/* Page */}
         <div className="relative h-[70vh] min-h-0 border-b bg-background lg:h-auto lg:border-b-0">
           {view === 'reader' && (
@@ -277,7 +277,7 @@ export function BrowserView({ jobId: initialJobId, url, initialView }: { jobId?:
                 </>
               )}
 
-              {tool === 'email' && (jobId ? <CoverLetterPanel jobId={jobId} initial={null} /> : (
+              {tool === 'email' && (jobId ? <CoverLetterPanel key={jobId} jobId={jobId} initial={data?.coverLetter ?? null} /> : (
                 <div className="flex flex-col gap-3">
                   <p className="text-sm text-muted-foreground">Save this job to your pipeline to write a cover letter for it.</p>
                   <Button variant="outline" onClick={() => setStatus('SAVED')} disabled={!!busy}><Bookmark /> Save to pipeline</Button>
@@ -325,7 +325,7 @@ function AnswerSheet({ sheet }: { sheet: Sheet }) {
           </div>
           {a.value ? (
             <div className="mt-1.5 flex items-start gap-2">
-              <p className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6">{a.value}</p>
+              <p className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6 [overflow-wrap:anywhere]">{a.value}</p>
               {a.type !== 'file' && <CopyButton text={a.value} label="" aria-label={`Copy ${a.label}`} className="h-7 w-7 shrink-0 p-0" />}
             </div>
           ) : (
