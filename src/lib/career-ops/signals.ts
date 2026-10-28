@@ -22,14 +22,8 @@ export const CLOSED_PATTERNS = [
   /\bjob expired\b/i,
 ];
 
-export const BOT_CHECK_PATTERNS = [
-  /just a moment/i,
-  /performing security verification/i,
-  /checking your browser before/i,
-  /verify you are (a |not a )?human/i,
-  /enable javascript and cookies to continue/i,
-  /attention required.*cloudflare/i,
-];
+export { BOT_CHECK_PATTERNS } from '../bot-check';
+import { BOT_CHECK_PATTERNS } from '../bot-check';
 
 export type Liveness = { state: 'open' | 'closed' | 'unknown'; reason: string; checkedAt: string };
 

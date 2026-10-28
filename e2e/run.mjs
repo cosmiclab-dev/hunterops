@@ -609,6 +609,38 @@ await step('every app page renders for a signed-in user', async () => {
   assert.match(old.headers.get('location'), /\/mailroom/);
 });
 
+await step('Crawl4AI page reader: JS-only pages read through it, blocked pages stay blocked', async () => {
+  const WEB = 'http://127.0.0.1:4020';
+  // Off by default: a JavaScript-only page reads as almost empty.
+  const before = await call('POST', '/api/browser/open', { url: `${WEB}/page/spa` });
+  assert.equal(before.status, 200, JSON.stringify(before.data));
+  assert.ok(!/Boolean search/.test(before.data.page.description));
+  assert.equal(before.data.page.via, 'direct');
+  assert.equal((await call('PUT', '/api/settings', { values: { crawl4ai_url: WEB, crawl4ai_token: 'hunter:c4-e2e' } })).status, 200);
+  const t = await call('POST', '/api/settings/test-reader', {});
+  assert.equal(t.status, 200, JSON.stringify(t.data));
+  const bad = await call('POST', '/api/settings/test-reader', { token: 'hunter:wrong' });
+  assert.equal(bad.status, 502);
+  assert.match(bad.data.error, /token/);
+  const after = await call('POST', '/api/browser/open', { url: `${WEB}/page/spa` });
+  assert.equal(after.status, 200, JSON.stringify(after.data));
+  assert.equal(after.data.page.via, 'crawl4ai');
+  assert.equal(after.data.page.title, 'Talent Partner, India');
+  assert.match(after.data.page.description, /Boolean search/);
+  assert.ok(after.data.page.salary, 'salary missing');
+  // A site that refuses readers is not retried through the crawler.
+  const blocked = await call('POST', '/api/browser/open', { url: `${WEB}/page/blocked` });
+  assert.equal(blocked.status, 502);
+  assert.match(blocked.data.error, /does not let apps read/);
+  // Pages with a real posting are still read directly.
+  const direct = await call('POST', '/api/browser/open', { url: `${WEB}/careers/senior-recruiter` });
+  assert.equal(direct.data.page.via, 'direct');
+  const st = await call('POST', '/api/selftest');
+  const reader = st.data.checks.find((c) => c.id === 'reader');
+  assert.equal(reader.ok, true, reader.detail);
+  assert.equal((await call('PUT', '/api/settings', { values: { crawl4ai_url: null, crawl4ai_token: null } })).status, 200);
+});
+
 await step('security: cross-site writes refused, signed-out API refused', async () => {
   const evil = await call('POST', '/api/settings', { values: {} }, { raw: true, headers: { origin: 'https://evil.example' } });
   assert.equal(evil.status, 403);

@@ -37,6 +37,8 @@ export const SETTINGS: Record<string, Def> = {
   email_signature: { label: 'Email signature' },
   search_provider: { label: 'Web search', fallback: 'free' },
   search_api_key: { label: 'Web search API key', secret: true, env: 'SEARCH_API_KEY' },
+  crawl4ai_url: { label: 'Page reader address (Crawl4AI)', env: 'CRAWL4AI_URL' },
+  crawl4ai_token: { label: 'Page reader token', secret: true, env: 'CRAWL4AI_TOKEN' },
   boards_scanned_at: { label: 'Boards last scanned', internal: true },
   seed_version: { label: 'Starter boards version', internal: true },
 };
