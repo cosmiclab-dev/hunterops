@@ -6,7 +6,7 @@ import {
   DndContext, DragOverlay, KeyboardSensor, PointerSensor, TouchSensor, closestCorners, useDraggable, useDroppable, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core';
-import { Clock3, Columns3, FileText, Globe, GripVertical, MessageSquareText } from 'lucide-react';
+import { Clock3, Columns3, Loader2, ShieldCheck, FileText, Globe, GripVertical, MessageSquareText } from 'lucide-react';
 import { GrillScoreBadge } from '@/components/grill-score-badge';
 import { EmptyState } from '@/components/kit';
 import { api } from '@/lib/api-client';
@@ -16,6 +16,15 @@ import { cn, timeAgo } from '@/lib/utils';
 export type KanbanJob = {
   id: string; title: string; company: string; location: string | null; status: string; grillScore: number | null;
   appliedAt: string | null; updatedAt: string; notes: string | null; touches: number; resumes: number;
+  application?: 'PREPARING' | 'PENDING' | 'APPROVED' | 'SUBMITTED' | 'FAILED' | null;
+};
+
+// The application badge on a card; it links to the review screen.
+const APP_BADGE: Record<string, { label: string; className: string }> = {
+  PREPARING: { label: 'Preparing…', className: 'bg-muted text-muted-foreground' },
+  PENDING: { label: 'Approval pending', className: 'bg-warning/15 text-warning' },
+  APPROVED: { label: 'Ready to submit', className: 'bg-primary/10 text-primary' },
+  FAILED: { label: 'Prep failed', className: 'bg-destructive/10 text-destructive' },
 };
 
 const APPLIED_STAGES = [['APPLIED', 'Applied'], ['INTERVIEW', 'Interview'], ['OFFER', 'Offer']] as const;
@@ -32,12 +41,18 @@ function CardBody({ j, onStage, dragging, move }: { j: KanbanJob; onStage?: (s: 
         </div>
         <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/60" aria-hidden />
       </div>
-      <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-        <span className="inline-flex min-w-0 items-center gap-1 whitespace-nowrap"><Clock3 className="h-3 w-3 shrink-0" />{j.appliedAt ? `Applied ${timeAgo(j.appliedAt)}` : timeAgo(j.updatedAt)}</span>
+      {j.application && APP_BADGE[j.application] && (
+        <Link href={`/apply/${j.id}`} onPointerDown={(e) => e.stopPropagation()} className={cn('inline-flex items-center gap-1.5 self-start rounded-full px-2.5 py-1 text-xs font-semibold', APP_BADGE[j.application].className)} data-testid="app-badge">
+          {j.application === 'PREPARING' ? <Loader2 className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+          {APP_BADGE[j.application].label}
+        </Link>
+      )}
+      <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground">
+        <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap"><Clock3 className="h-3 w-3 shrink-0" />{j.appliedAt ? `Applied ${timeAgo(j.appliedAt)}` : timeAgo(j.updatedAt)}</span>
         {j.touches > 0 && <span className="inline-flex items-center gap-1"><MessageSquareText className="h-3 w-3" />{j.touches}</span>}
         {j.resumes > 0 && <span className="inline-flex items-center gap-1"><FileText className="h-3 w-3" />{j.resumes}</span>}
         <Link href={`/browser/${j.id}`} className="ml-auto inline-flex items-center gap-1 hover:text-foreground" onPointerDown={(e) => e.stopPropagation()} aria-label={`Open ${j.title} in Browser`}>
-          <Globe className="h-3 w-3" /> Open
+          <Globe className="h-3 w-3" /><span className="max-[400px]:sr-only">Open</span>
         </Link>
         {move}
       </div>

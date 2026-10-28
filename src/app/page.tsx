@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import {
-  ArrowRight, BellRing, CalendarClock, Flame, Handshake, Lightbulb, MessageSquareText, Radar, Send, Sparkles, Target, Trophy,
+  ArrowRight, BellRing, ShieldCheck, CalendarClock, Flame, Handshake, Lightbulb, MessageSquareText, Radar, Send, Sparkles, Target, Trophy,
 } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { EmptyState, IconChip, PageHeader, Pill, Section, StatTile } from '@/components/kit';
@@ -25,7 +25,7 @@ function istDayKey(d: Date) {
 export default async function Dashboard() {
   const now = new Date();
   const since14 = new Date(now.getTime() - 13 * DAY);
-  const [counts, profile, settings, fresh, followUps, staleApplied, appliedDates, sentDates, lastRun, outreachCount] = await Promise.all([
+  const [counts, profile, settings, fresh, followUps, staleApplied, appliedDates, sentDates, lastRun, outreachCount, approvals] = await Promise.all([
     prisma.job.groupBy({ by: ['status'], _count: true }),
     loadProfile(),
     loadSettings(),
@@ -51,6 +51,7 @@ export default async function Dashboard() {
     prisma.outreach.findMany({ where: { sentAt: { gte: since14 } }, select: { sentAt: true } }),
     prisma.scanRun.findFirst({ orderBy: { startedAt: 'desc' }, select: { startedAt: true, inserted: true } }),
     prisma.outreach.count({ where: { status: { in: ['sent', 'replied'] } } }),
+    prisma.application.findMany({ where: { status: { in: ['PENDING', 'APPROVED'] } }, orderBy: { updatedAt: 'desc' }, take: 5, select: { jobId: true, status: true, job: { select: { title: true, company: true } } } }),
   ]);
   const n = (s: string[]) => counts.filter((c) => s.includes(c.status)).reduce((a, c) => a + c._count, 0);
   const daysLeft = Math.max(0, Math.ceil((GOAL_DATE(now).getTime() - now.getTime()) / DAY));
@@ -77,7 +78,7 @@ export default async function Dashboard() {
     { label: 'Offer', value: n(['OFFER']), tone: 'bg-success' },
   ];
   const pipeTotal = Math.max(1, pipeline.reduce((a, p) => a + p.value, 0));
-  const nudges = followUps.length + staleApplied.length;
+  const nudges = followUps.length + staleApplied.length + approvals.length;
   const provider = (settings.get('llm_provider') || 'opencode') as ProviderId;
   const providerDef = PROVIDERS[provider];
   const steps = [
@@ -116,6 +117,16 @@ export default async function Dashboard() {
       <Section title="Do today">
         {nudges ? (
           <div className="surface divide-y overflow-hidden">
+            {approvals.map((a) => (
+              <Link key={a.jobId} href={`/apply/${a.jobId}`} className="flex items-center gap-3 p-3 hover:bg-accent/60" data-testid="home-approval">
+                <IconChip icon={ShieldCheck} tone={a.status === 'PENDING' ? 'warning' : 'primary'} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold leading-5">{a.status === 'PENDING' ? 'Approve' : 'Submit'} your application to {a.job.company}</p>
+                  <p className="truncate text-sm text-muted-foreground">{a.job.title}</p>
+                </div>
+                <Pill tone={a.status === 'PENDING' ? 'warning' : 'primary'}>{a.status === 'PENDING' ? 'approval pending' : 'ready'}</Pill>
+              </Link>
+            ))}
             {followUps.map((f) => (
               <Link key={f.id} href="/mailroom?tab=log" className="flex items-center gap-3 p-3 hover:bg-accent/60">
                 <IconChip icon={BellRing} tone="warning" />
@@ -146,7 +157,7 @@ export default async function Dashboard() {
         <StatTile label="New jobs" value={n(['NEW'])} hint={`${fresh.length} in the last 24h`} icon={Flame} tone="danger" href="/jobs?view=new" />
         <StatTile label="Applied" value={n(['APPLIED', 'INTERVIEW', 'OFFER'])} hint="all time" icon={Send} tone="primary" href="/pipeline" />
         <StatTile label="Interviews" value={n(['INTERVIEW'])} hint={n(['OFFER']) ? `${n(['OFFER'])} offer${n(['OFFER']) > 1 ? 's' : ''}` : 'keep going'} icon={Trophy} tone="warning" href="/pipeline" />
-        <StatTile label="Outreach sent" value={outreachCount} hint={nudges ? `${nudges} follow-up${nudges > 1 ? 's' : ''} due` : 'none due'} icon={MessageSquareText} tone="info" href="/mailroom?tab=log" />
+        <StatTile label="Outreach sent" value={outreachCount} hint={followUps.length + staleApplied.length ? `${followUps.length + staleApplied.length} follow-up${followUps.length + staleApplied.length > 1 ? 's' : ''} due` : 'none due'} icon={MessageSquareText} tone="info" href="/mailroom?tab=log" />
       </div>
 
       <div className="grid gap-8 md:grid-cols-[1.4fr_1fr]">

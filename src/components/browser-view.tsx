@@ -64,11 +64,11 @@ const TOOLS: { id: Tool; label: string; icon: typeof Flame }[] = [
 
 // The in-app Browser: the posting on the left (reader, live page, or the
 // official application form), the HunterOps control panel on the right.
-export function BrowserView({ jobId: initialJobId, url }: { jobId?: string; url?: string }) {
+export function BrowserView({ jobId: initialJobId, url, initialView }: { jobId?: string; url?: string; initialView?: View }) {
   const dark = useDark();
   const [data, setData] = useState<Opened | null>(null);
   const [err, setErr] = useState('');
-  const [view, setView] = useState<View>('reader');
+  const [view, setView] = useState<View>(initialView ?? 'reader');
   const [tool, setTool] = useState<Tool>('analyze');
   const [panel, setPanel] = useState(true);
   const [busy, setBusy] = useState('');
@@ -225,7 +225,8 @@ export function BrowserView({ jobId: initialJobId, url }: { jobId?: string; url?
                     <Button size="sm" variant="outline" onClick={() => setStatus('SAVED')} disabled={!!busy || status === 'SAVED'} data-testid="save-to-pipeline">
                       <Bookmark /> {status === 'SAVED' ? 'In pipeline' : 'Save to pipeline'}
                     </Button>
-                    <Button size="sm" onClick={() => setStatus('APPLIED')} disabled={!!busy} data-testid="mark-applied"><CheckCircle2 /> Mark applied</Button>
+                    {jobId && <Button size="sm" asChild><Link href={`/apply/${jobId}`}><Wand2 /> Apply with AI</Link></Button>}
+                    <Button size="sm" variant="outline" onClick={() => setStatus('APPLIED')} disabled={!!busy} data-testid="mark-applied"><CheckCircle2 /> Mark applied</Button>
                   </>
                 )}
               </div>

@@ -69,6 +69,8 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
 
   const [gmail, setGmail] = useState({ user: initial.smtp_user.value || '', pass: '', name: initial.sender_name.value || '', cap: initial.daily_email_cap.value || '20' });
   const [mail, setMail] = useState({ msg: '', err: '' });
+  const [auto, setAuto] = useState({ count: initial.auto_apply_count?.value || '3', min: initial.auto_apply_min_score?.value || '75' });
+  const [autoMsg, setAutoMsg] = useState({ msg: '', err: '' });
 
   const [feed, setFeed] = useState({
     keywords: initial.feed_keywords.value || '',
@@ -209,6 +211,16 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
     }
   }
 
+  async function saveAuto() {
+    setAutoMsg({ msg: '', err: '' });
+    try {
+      await save({ auto_apply_count: auto.count.trim() || null, auto_apply_min_score: auto.min.trim() || null });
+      setAutoMsg({ msg: 'Saved.', err: '' });
+    } catch (e) {
+      setAutoMsg({ msg: '', err: (e as Error).message });
+    }
+  }
+
   async function saveFeed() {
     setFeedMsg({ msg: '', err: '' });
     try {
@@ -315,6 +327,14 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
       </Section>
         </Group>
         <Group id="search" title="Job search">
+      <Section title="Applications" id="applications" desc="Each morning after the scan, the AI prepares applications for your best new matches: answers, a tailored resume and a cover letter. They wait on the Pipeline as Approval pending. Nothing is ever submitted for you.">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1"><Label htmlFor="acount">Each morning (0 = off)</Label><Input id="acount" inputMode="numeric" value={auto.count} onChange={(e) => setAuto({ ...auto, count: e.target.value })} /></div>
+          <div className="flex flex-col gap-1"><Label htmlFor="amin">Lowest Grill Score</Label><Input id="amin" inputMode="numeric" value={auto.min} onChange={(e) => setAuto({ ...auto, min: e.target.value })} /></div>
+        </div>
+        <Button className="self-start" onClick={saveAuto}>Save</Button>
+        <Status {...autoMsg} />
+      </Section>
       <Section title="Job feed" desc="What the scan looks for. Changes apply from the next scan.">
         <div className="flex flex-col gap-1"><Label htmlFor="kw">Role keywords (comma separated)</Label><Textarea id="kw" rows={3} value={feed.keywords} onChange={(e) => setFeed({ ...feed, keywords: e.target.value })} /></div>
         <div className="flex flex-col gap-1"><Label htmlFor="ex">Exclude titles with</Label><Input id="ex" value={feed.exclude} onChange={(e) => setFeed({ ...feed, exclude: e.target.value })} /></div>

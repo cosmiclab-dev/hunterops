@@ -593,6 +593,49 @@ await step('Pipeline columns: Scouted, Grilled 75+, Applied, Rejected', async ()
   assert.equal((await call('PATCH', `/api/jobs/${ghJob.id}`, { status: 'SAVED' })).status, 200);
 });
 
+await step('Apply with AI: prepared, approval pending on the Pipeline, approved, submitted by the person, Applied', async () => {
+  assert.equal((await call('GET', `/api/applications/${ghJob.id}`)).data.application, null);
+  const prep = await call('POST', '/api/applications', { jobId: ghJob.id });
+  assert.equal(prep.status, 201, JSON.stringify(prep.data));
+  assert.equal(prep.data.application.status, 'PENDING');
+  const got = (await call('GET', `/api/applications/${ghJob.id}`)).data.application;
+  const by = Object.fromEntries(got.answers.map((a) => [a.key, a]));
+  assert.equal(by.first_name.value, 'Divya');
+  assert.ok(got.resume?.id, 'tailored resume missing');
+  assert.ok(got.coverLetter && got.coverLetter.length > 50, 'cover letter missing');
+  assert.ok(got.embedUrl, 'Greenhouse form link missing');
+  // The Pipeline and Home show it waiting for approval.
+  assert.match(await (await call('GET', '/pipeline', undefined, { raw: true })).text(), /Approval pending/);
+  assert.match(await (await call('GET', '/', undefined, { raw: true })).text(), /approval pending/i);
+  // Nothing moves without the person: no submit before approval, no approval without confirming.
+  assert.equal((await call('POST', `/api/applications/${ghJob.id}/submitted`)).status, 409);
+  assert.equal((await call('POST', `/api/applications/${ghJob.id}/approve`, {})).status, 400);
+  // An edit during review is kept and marked as theirs.
+  const edited = await call('PATCH', `/api/applications/${ghJob.id}`, { answers: [{ key: 'question_3', value: 'I hire for GCCs.' }] });
+  assert.equal(edited.status, 200, JSON.stringify(edited.data));
+  assert.equal(edited.data.application.answers.find((a) => a.key === 'question_3').source, 'you');
+  const ok1 = await call('POST', `/api/applications/${ghJob.id}/approve`, { approve: true });
+  assert.equal(ok1.status, 200, JSON.stringify(ok1.data));
+  assert.equal(ok1.data.application.status, 'APPROVED');
+  assert.equal((await call('POST', `/api/applications/${ghJob.id}/approve`, { approve: true })).status, 409);
+  const done = await call('POST', `/api/applications/${ghJob.id}/submitted`);
+  assert.equal(done.status, 200, JSON.stringify(done.data));
+  const job = (await call('GET', `/api/jobs/${ghJob.id}`)).data.job;
+  assert.equal(job.status, 'APPLIED');
+  assert.ok(job.appliedAt);
+  assert.equal((await call('POST', '/api/applications', { jobId: ghJob.id })).status, 409);
+  assert.equal((await call('GET', `/apply/${ghJob.id}`, undefined, { raw: true })).status, 200);
+  // The morning run needs CRON_SECRET; the Pipeline button prepares top matches (or says there are none).
+  assert.equal((await fetch(BASE + '/api/cron/prepare')).status, 401);
+  assert.equal((await call('PUT', '/api/settings', { values: { auto_apply_count: '9' } })).status, 400);
+  assert.equal((await call('PUT', '/api/settings', { values: { auto_apply_count: '1', auto_apply_min_score: '0' } })).status, 200);
+  const auto = await call('POST', '/api/applications/auto');
+  assert.equal(auto.status, 200, JSON.stringify(auto.data));
+  assert.equal(auto.data.off, false);
+  assert.ok(auto.data.prepared.length + auto.data.failed.length <= 1);
+  assert.equal((await call('PUT', '/api/settings', { values: { auto_apply_count: null, auto_apply_min_score: null } })).status, 200);
+});
+
 await step('scan summary says how many matches are already on the board', async () => {
   const r = await call('POST', '/api/scan', { force: true });
   assert.equal(r.status, 200, JSON.stringify(r.data));

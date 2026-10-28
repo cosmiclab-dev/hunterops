@@ -31,6 +31,8 @@ export const SETTINGS: Record<string, Def> = {
   },
   feed_exclude: { label: 'Exclude words', fallback: 'intern, internship, trainee, apprentice' },
   feed_locations: { label: 'Locations', fallback: 'bengaluru,remote_india,remote_global' },
+  auto_apply_count: { label: 'Applications the AI prepares each morning', fallback: '3' },
+  auto_apply_min_score: { label: 'Lowest Grill Score it prepares for', fallback: '75' },
   banned_words_extra: { label: 'Extra banned words' },
   writing_tone: { label: 'Writing tone', fallback: 'warm' },
   email_length: { label: 'Email length', fallback: 'standard' },

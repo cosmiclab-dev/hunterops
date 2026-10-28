@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ExternalLink, Globe, Send } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Globe, Send, Wand2 } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,7 +44,10 @@ export default async function JobPage({ params }: { params: { id: string } }) {
           <p className="meta mt-2">{[job.location, job.workMode !== 'UNKNOWN' ? job.workMode.toLowerCase() : null, job.salary, job.source, timeAgo(job.postedAt || job.firstSeenAt)].filter(Boolean).join(' · ')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild>
+          <Button asChild data-testid="apply-with-ai">
+            <Link href={`/apply/${job.id}`}><Wand2 /> Apply with AI</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href={`/browser/${job.id}`}><Globe /> Open in Browser</Link>
           </Button>
           <Button asChild variant="outline">
