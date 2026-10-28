@@ -10,6 +10,7 @@ import { ResumePanel } from '@/components/resume-panel';
 import { EmailPanel } from '@/components/email-panel';
 import { SlopChecker } from '@/components/slop-checker';
 import { CoverLetterPanel } from '@/components/cover-letter-panel';
+import { EvaluationPanel, type ReportRow } from '@/components/evaluation-panel';
 import type { GrillResult } from '@/lib/modules/grill';
 import { timeAgo } from '@/lib/utils';
 
@@ -23,10 +24,13 @@ export default async function JobPage({ params }: { params: { id: string } }) {
       resumes: { orderBy: { createdAt: 'desc' }, select: { id: true, name: true, createdAt: true, slopScore: true } },
       emails: { orderBy: { createdAt: 'desc' } },
       artifact: { select: { coverLetterText: true } },
+      reports: { where: { mode: 'evaluation' }, orderBy: { createdAt: 'desc' }, take: 1 },
     },
   });
   if (!job) notFound();
   const g = job.grillBreakdown as unknown as GrillResult | null;
+  const ev = job.reports[0];
+  const evaluation = ev ? ({ id: ev.id, score: ev.score, model: ev.model, createdAt: ev.createdAt.toISOString(), data: ev.data } as unknown as ReportRow) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -52,9 +56,10 @@ export default async function JobPage({ params }: { params: { id: string } }) {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="order-2 flex min-w-0 flex-col gap-6 lg:order-1">
-          <Tabs defaultValue="jd">
+          <Tabs defaultValue={evaluation ? 'evaluate' : 'jd'}>
             <div className="scroll-x">
               <TabsList>
+                <TabsTrigger value="evaluate">Evaluate</TabsTrigger>
                 <TabsTrigger value="jd">Description</TabsTrigger>
                 <TabsTrigger value="resume">Resume</TabsTrigger>
                 <TabsTrigger value="cover">Cover letter</TabsTrigger>
@@ -62,6 +67,9 @@ export default async function JobPage({ params }: { params: { id: string } }) {
                 <TabsTrigger value="check">Slop check</TabsTrigger>
               </TabsList>
             </div>
+            <TabsContent value="evaluate">
+              <EvaluationPanel jobId={job.id} initial={evaluation} />
+            </TabsContent>
             <TabsContent value="jd">
               <div className="surface whitespace-pre-wrap p-5 text-sm leading-6">{job.description || 'No description yet. Open it in the Browser and HunterOps reads the full posting.'}</div>
             </TabsContent>

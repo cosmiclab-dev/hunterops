@@ -513,6 +513,27 @@ await step('Discover in-app: free search (no key) finds ATS jobs and people; Ser
   await call('PUT', '/api/settings', { values: { search_api_key: 'serper-e2e' } });
 });
 
+await step('Career-Ops evaluation: liveness, repost and pay signals, A-H report, story bank', async () => {
+  const r = await call('POST', '/api/career-ops/evaluate', { jobId: ghJob.id });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  const d = r.data.report.data;
+  assert.equal(r.data.report.score, 4.2);
+  assert.equal(d.liveness.state, 'open', d.liveness.reason);
+  assert.deepEqual(d.signals.map((s) => s.id), ['live', 'age', 'repost', 'pay', 'detail']);
+  const intel = d.match.rows.find((x) => x.requirement === 'Market intel');
+  assert.equal(intel.importance, 'meaningful', 'inferred rows must not be critical');
+  assert.equal(intel.jdSignal, '');
+  assert.equal(d.match.rows[0].requirement, '6+ years of tech hiring');
+  assert.equal(d.confidence, 'medium', 'confidence must follow the evidence');
+  assert.equal(r.data.storiesAdded, 1);
+  const again = await call('POST', '/api/career-ops/evaluate', { jobId: ghJob.id });
+  assert.equal(again.data.storiesAdded, 0);
+  const got = await call('GET', `/api/career-ops/evaluate?jobId=${ghJob.id}`);
+  assert.equal(got.data.report.id, again.data.report.id);
+  const html = await (await call('GET', `/jobs/${ghJob.id}`, undefined, { raw: true })).text();
+  assert.ok(html.includes('Worth applying this week'));
+});
+
 await step('Pipeline columns: Scouted, Grilled 75+, Applied, Rejected', async () => {
   const res = await call('GET', '/pipeline', undefined, { raw: true });
   assert.equal(res.status, 200);

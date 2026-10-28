@@ -82,6 +82,38 @@ function answer(system, messages) {
       phone: 'After Capgemini I took a planned break from November 2025. I spent it learning AI sourcing tools and mapping the Bengaluru GCC market. The upside for you is that I can start right away. Most candidates you speak to will be on 60 to 90 days notice.',
     });
   }
+  if (/full A-H evaluation/.test(system)) {
+    return JSON.stringify({
+      archetype: { name: 'Tech hiring partner', targeted: true, why: 'Senior TA partner for a GCC.' },
+      summary: { domain: 'Tech hiring', function: 'Individual partner', seniority: 'Senior', workMode: 'Hybrid, Bengaluru', teamSize: '', culture: { verdict: 'caution', evidence: 'No team or interview process described.' }, tldr: 'Senior TA partner hiring engineers for a Bengaluru GCC.' },
+      flags: [],
+      match: {
+        rows: [
+          { requirement: 'Workday', importance: 'preferred', tier: 'structural', match: 'missing', jdSignal: 'Nice to have', evidence: 'Not in profile.' },
+          { requirement: 'Market intel', importance: 'critical', tier: 'inferred', match: 'partial', jdSignal: 'made up', evidence: 'Some mapping work.' },
+          { requirement: '6+ years of tech hiring', importance: 'critical', tier: 'stated', match: 'strong', jdSignal: '6+ years of experience in tech hiring', evidence: 'Senior Recruiter at Capgemini since 2020.' },
+        ],
+        dropped: 2,
+        gaps: [{ requirement: 'Workday', blocker: false, risk: 'They may ask about ATS admin.', mitigation: 'Mention Greenhouse and SuccessFactors use.' }],
+      },
+      level: { detected: 'Senior IC', natural: 'Senior IC', sellSenior: ['Lead with the 120 engineers hired in 12 months.'], ifDownleveled: ['Ask for a 6-month review.'] },
+      comp: { companyType: 'MNC / GCC', reliability: 'medium', advertised: 'CTC 22-30 LPA', notes: ['CTC usually includes variable pay.'], hrQuestions: ['What is the fixed part of the CTC?'], demand: 'Steady demand for GCC tech hiring in Bengaluru.' },
+      plan: { cv: [{ section: 'Summary', change: 'Open with GCC tech hiring.', why: 'Mirrors the JD.' }], linkedin: [{ section: 'Headline', change: 'Senior TA Partner, tech and GCC hiring', why: 'Search match.' }] },
+      interview: {
+        stories: [{ requirement: 'Tech hiring at scale', theme: 'Scale', title: 'Hiring 120 engineers in 12 months', situation: 'Capgemini needed engineers fast.', task: 'Own the pipeline.', action: 'Ran weekly intake and Boolean sourcing.', result: '120 hires in 12 months.', reflection: 'Would set up referrals earlier.', bestFor: 'Volume, pressure' }],
+        caseStudy: 'The 120-engineer ramp.',
+        hardQuestions: [{ question: 'What have you done since November 2025?', answer: 'A planned break; I learned AI sourcing tools.' }],
+      },
+      legitimacy: { tier: 'high', observations: ['Recent posting with specific requirements.'] },
+      dimensions: { cv: 4.5, northStar: 4, comp: 4, culture: 3, redFlags: 4 },
+      evidence: { cv: 'supported', northStar: 'supported', comp: 'partial', culture: 'partial', redFlags: 'supported' },
+      score: 4.2, confidence: 'high', confidenceGaps: ['Confirm the fixed part of the CTC.'],
+      verdict: { apply: true, headline: 'Worth applying this week', why: 'Strong match on tech hiring scale.' },
+      risks: ['Hybrid three days a week.'],
+      answers: [{ question: 'Notice period', answer: 'I can join immediately.' }],
+      keywords: ['tech hiring', 'Boolean search', 'stakeholder management'],
+    });
+  }
   return '{}';
 }
 

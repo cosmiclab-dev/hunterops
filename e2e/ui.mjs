@@ -156,6 +156,16 @@ await gcard.getByTestId('missing-keywords').waitFor();
 await gcard.getByTestId('generate-resume').waitFor();
 await shot('d07-job');
 ok('job page: Grill card with gauge, four dimensions, missing keywords, Generate resume');
+const jobUrl = page.url();
+await page.getByRole('tab', { name: 'Evaluate' }).click();
+await page.getByRole('button', { name: 'Run full evaluation' }).click();
+await page.getByTestId('eval-score').waitFor({ timeout: 60_000 });
+assert.equal(await page.getByTestId('eval-score').innerText(), '4.2');
+await page.getByText('Draft answers for the application form').waitFor();
+await shot('d07b-evaluation');
+await page.reload();
+await page.getByTestId('eval-score').waitFor();
+ok('job page: Career-Ops A-H evaluation runs and opens by default afterwards');
 
 await page.getByRole('tab', { name: 'Email' }).click();
 await page.fill('#to', 'lead@beta.example');
@@ -244,8 +254,8 @@ await page.context().close();
 // ---------------- iPhone ----------------
 const phone = await open({ ...devices['iPhone 14'] });
 const pshot = (name) => phone.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
-for (const [path, name] of [['/', 'p00-home'], ['/discover', 'p01-discover'], ['/pipeline', 'p02-pipeline'], ['/browser', 'p03-browser'], [`/browser/${jobId}`, 'p04-browser-job'], ['/mailroom', 'p05-mailroom'], ['/jobs?view=all', 'p06-jobs'], ['/profile', 'p07-profile'], ['/settings', 'p08-settings']]) {
-  await phone.goto(BASE + path);
+for (const [path, name] of [['/', 'p00-home'], ['/discover', 'p01-discover'], ['/pipeline', 'p02-pipeline'], ['/browser', 'p03-browser'], [`/browser/${jobId}`, 'p04-browser-job'], ['/mailroom', 'p05-mailroom'], ['/jobs?view=all', 'p06-jobs'], ['/profile', 'p07-profile'], ['/settings', 'p08-settings'], ['__job__', 'p09-evaluation']]) {
+  await phone.goto(path === '__job__' ? jobUrl : BASE + path);
   await phone.waitForLoadState('networkidle');
   await noSideScroll(phone, `phone ${path}`);
   await pshot(name);
