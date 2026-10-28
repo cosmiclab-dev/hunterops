@@ -103,7 +103,7 @@ await step('Apply with AI on a real Greenhouse, Lever or Ashby job reads its rea
   await page.getByTestId('prepare-application').click();
   const res = await prepared;
   assert.equal(res.status(), 202, await res.text());
-  await page.locator('[data-testid=apply-view]:not([data-status=PREPARING])').waitFor({ timeout: 280_000 });
+  await page.locator('[data-testid=apply-view]:not([data-status=PREPARING])').waitFor({ timeout: Number(process.env.APPLY_WAIT_MS) || 280_000 });
   const status = await page.getByTestId('apply-view').getAttribute('data-status');
   const app = JSON.parse(sql(`SELECT row_to_json(a) FROM (SELECT status, error, notes, resume_id, length(cover_letter) AS letter FROM applications WHERE job_id = '${id}') a`));
   assert.equal(status, 'PENDING', JSON.stringify(app));

@@ -123,8 +123,38 @@ function readContent(cfg: LlmConfig, data: any): string | undefined {
   return data?.choices?.[0]?.message?.content;
 }
 
+// Free providers that allow one reply every N seconds (LLM_MIN_GAP_MS) get
+// their calls one at a time, each N seconds after the last answer, instead of
+// a burst they refuse.
+const MIN_GAP_MS = Number(process.env.LLM_MIN_GAP_MS) || 0;
+let queue: Promise<number> = Promise.resolve(0);
+async function takeTurn(): Promise<() => void> {
+  if (!MIN_GAP_MS) return () => {};
+  let release!: (t: number) => void;
+  const prev = queue;
+  queue = new Promise<number>((r) => (release = r));
+  const ended = await prev;
+  const wait = ended + MIN_GAP_MS - Date.now();
+  if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+  return () => release(Date.now());
+}
+
 export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
   if (!opts.session) opts = { ...opts, session: crypto.randomUUID() };
+  const done = await takeTurn();
+  // A retry gives up this turn and waits for a new one.
+  const again = (o: ChatOptions) => {
+    done();
+    return chat(cfg, messages, o);
+  };
+  try {
+    return await send(cfg, messages, opts, again);
+  } finally {
+    done();
+  }
+}
+
+async function send(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions, again: (o: ChatOptions) => Promise<ChatResult>): Promise<ChatResult> {
   // Thinking models can take well over a minute on long prompts.
   const left = timeLeft() - 5_000;
   if (left < 10_000) throw new HttpError(504, 'This ran out of time before the AI could finish. Try again, or pick a faster model in Settings.');
@@ -157,7 +187,7 @@ export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOp
     // Some models reject response_format or temperature, and not every provider
     // names the field in its error; retry once with the plainest request.
     if (res.status === 400 && (opts.json || opts.temperature !== undefined)) {
-      return chat(cfg, messages, { ...opts, json: false, temperature: undefined });
+      return again({ ...opts, json: false, temperature: undefined });
     }
     console.error('[llm] upstream', res.status, raw.slice(0, 500));
     throw new HttpError(502, upstreamHint(cfg, res.status, raw));
@@ -173,7 +203,7 @@ export async function chat(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOp
   if (typeof content !== 'string' || !content.trim()) {
     const cut = data?.choices?.[0]?.finish_reason === 'length' || data?.stop_reason === 'max_tokens';
     const budget = Math.max(opts.maxTokens ?? 2000, MIN_OUTPUT_TOKENS);
-    if (cut && budget < MAX_OUTPUT_TOKENS) return chat(cfg, messages, { ...opts, maxTokens: budget * 3 });
+    if (cut && budget < MAX_OUTPUT_TOKENS) return again({ ...opts, maxTokens: budget * 3 });
     throw new HttpError(502, cut
       ? `"${cfg.model}" used its whole answer budget thinking. Try again, or pick a faster model in Settings.`
       : 'The model returned an empty answer. Try again.');

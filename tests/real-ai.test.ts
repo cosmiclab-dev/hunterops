@@ -101,3 +101,24 @@ describe('profile from a CV', () => {
     expect(s.missing).toEqual(['expected CTC']);
   });
 });
+
+describe('a free provider that allows one reply at a time', () => {
+  it('sends calls one by one, spaced by LLM_MIN_GAP_MS, including retries', async () => {
+    vi.resetModules();
+    vi.stubEnv('LLM_MIN_GAP_MS', '200');
+    const { chat, chatJson: json } = await import('@/lib/llm/client');
+    const spans: [number, number][] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
+      const start = Date.now();
+      await new Promise((r) => setTimeout(r, 30));
+      spans.push([start, Date.now()]);
+      const n = JSON.parse(init.body as string).messages.length;
+      // The JSON call's first answer is not JSON, so it asks again.
+      return reply(n === 1 && spans.length === 1 ? 'not json' : '{"ok":true}');
+    }));
+    await Promise.all([json(cfg, [{ role: 'user', content: 'a' }]), chat(cfg, [{ role: 'user', content: 'b' }]), chat(cfg, [{ role: 'user', content: 'c' }])]);
+    expect(spans).toHaveLength(4);
+    for (let i = 1; i < spans.length; i++) expect(spans[i][0] - spans[i - 1][1]).toBeGreaterThanOrEqual(195);
+    vi.unstubAllEnvs();
+  });
+});
