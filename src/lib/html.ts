@@ -135,8 +135,14 @@ export function formFields(html: string): FormField[] {
     if (tag === 'input' && !FIELD_TYPES.has(rawType)) continue;
     const id = el.getAttribute('id') || '';
     const name = el.getAttribute('name') || id;
-    const wrapLabel = el.closest('label')?.text;
-    const label = (labels.get(id) || el.getAttribute('aria-label') || wrapLabel || el.getAttribute('placeholder') || name || '').replace(/\s+/g, ' ').replace(/\*\s*$/, '').trim();
+    // Lever and similar forms wrap the input in a <label> that also holds
+    // upload status and hints; the question is the part marked as the label.
+    const wrap = el.closest('label');
+    const wrapLabel = wrap ? (wrap.querySelector('.application-label, [class*="label"]')?.text ?? wrap.text) : undefined;
+    const rawLabel = (labels.get(id) || el.getAttribute('aria-label') || wrapLabel || el.getAttribute('placeholder') || name || '').replace(/\s+/g, ' ').trim();
+    // Lever marks required questions with ✱ instead of *.
+    const marked = /[*✱]\s*$/.test(rawLabel);
+    const label = rawLabel.replace(/[*✱]\s*$/, '').trim();
     if (!label || /captcha|csrf|token|honeypot/i.test(`${name} ${label}`)) continue;
     const key = name || slug(label);
     // Radio buttons are one question: group them by name, each button an option.
@@ -156,7 +162,7 @@ export function formFields(html: string): FormField[] {
     seen.add(key);
     const type = (tag === 'textarea' ? 'textarea' : tag === 'select' ? 'select' : rawType) as FormField['type'];
     const options = tag === 'select' ? el.querySelectorAll('option').map((o) => o.text.trim()).filter((o) => o && !/^select|^--/i.test(o)).slice(0, 40) : undefined;
-    fields.push({ key, label: label.slice(0, 300), type, required: el.hasAttribute('required') || el.getAttribute('aria-required') === 'true' || starred.has(id), options });
+    fields.push({ key, label: label.slice(0, 300), type, required: el.hasAttribute('required') || el.getAttribute('aria-required') === 'true' || starred.has(id) || marked, options });
     if (fields.length >= 60) break;
   }
   // Only an application form counts: a site's country picker or search box is

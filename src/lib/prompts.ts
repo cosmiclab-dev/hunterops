@@ -29,7 +29,7 @@ export function tailorResumeMessages(a: { profileJson: string; jd: string; title
 
 Rules:
 - Use ONLY facts from the profile JSON. You may reorder, rephrase, merge and drop content. Never add an employer, title, date, degree, tool or certification that is not in the profile.
-- ${NO_FABRICATION}
+- ${NO_FABRICATION_FINAL}
 - Mirror exact JD keywords where the profile genuinely supports them (ATS matching).
 - One page under 8 years of experience, two pages otherwise. Older roles get 1-2 bullets. Each bullet at most 2 lines (about 30 words).
 - No first person.
@@ -44,7 +44,7 @@ ${JSON_ONLY} Shape (same structure as the input profile):
   "education": [ { "school": "", "degree": "", "start": "", "end": "", "details": "" } ],
   "certifications": ["..."],
   "achievements": ["..."],
-  "notes_for_candidate": ["what to verify, which [X] slots to fill"]
+  "notes_for_candidate": ["what to verify before sending"]
 }`;
   const user = `TARGET JOB: ${[a.title, a.company].filter(Boolean).join(' at ')}
 """
@@ -99,7 +99,7 @@ Rules:
 - ${first ? `Open with "Hi ${first},"` : `Open with "Dear ${a.company} hiring team,"`} and close with the candidate's first name only.
 - Tone: ${TONES[a.tone ?? 'warm']}
 - No "I hope this finds you well", no "I am writing to express", no emojis.
-- ${letter ? NO_FABRICATION_FINAL : NO_FABRICATION}
+- ${NO_FABRICATION_FINAL}
 - ${antiSlopInstruction()}
 
 ${JSON_ONLY} Shape: { "subject": "...", "body": "..." }`;
@@ -175,7 +175,7 @@ Rules:
 - Under 60 words each. Count them.
 - Open with "Hi ${first}," and sign off with the candidate's first name.
 - No "I hope this finds you well", no "I am writing to", no emojis, no hashtags.
-- ${NO_FABRICATION}
+- ${NO_FABRICATION_FINAL}
 - ${antiSlopInstruction()}
 
 ${JSON_ONLY} Shape: { "head_of_ta": "", "peer_referral": "", "practice_head": "" }`;
@@ -198,7 +198,7 @@ export function gapMessages(a: { gapSince: string; reason?: string; profileText:
 Both: state the gap plainly without apologising; frame the time as a deliberate reset plus upskilling (use the reason given, or AI-assisted sourcing and market mapping if none); end on the advantage of joining immediately with a 0-day notice period, compared with candidates on 60 to 90 day notice.
 
 Rules:
-- ${NO_FABRICATION}
+- ${NO_FABRICATION_FINAL}
 - First person, plain spoken English.
 - ${antiSlopInstruction()}
 

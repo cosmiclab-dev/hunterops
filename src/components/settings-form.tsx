@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { ThemeSwitch } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,7 +44,11 @@ export const SETTINGS_GROUPS = [
   { id: 'appearance', label: 'Appearance' },
 ] as const;
 
+// One group shows at a time, so Settings reads as short pages, not one long form.
+const OpenGroup = createContext<string>('selftest');
+
 function Group({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+  if (useContext(OpenGroup) !== id) return null;
   return (
     <div id={`g-${id}`} className="flex scroll-mt-24 flex-col gap-3">
       <h2 className="px-4 text-[13px] uppercase tracking-[0.02em] text-muted-foreground">{title}</h2>
@@ -57,10 +61,14 @@ function Status({ msg, err }: { msg: string; err: string }) {
   return <>{msg && <p className="meta" role="status">{msg}</p>}{err && <p className="text-sm text-destructive" role="alert">{err}</p>}</>;
 }
 
-export function SettingsForm({ initial, providers, companies: initialCompanies, appSecret, selfTest }: {
-  initial: Pub; providers: Record<string, ProviderDef>; companies: Company[]; appSecret: boolean; selfTest?: React.ReactNode;
+export function SettingsForm({ initial, providers, companies: initialCompanies, appSecret, selfTest, initialGroup }: {
+  initial: Pub; providers: Record<string, ProviderDef>; companies: Company[]; appSecret: boolean; selfTest?: React.ReactNode; initialGroup?: string;
 }) {
   const [s, setS] = useState(initial);
+  // Opens on the AI until a model is connected, then on the live check.
+  const [group, setGroup] = useState<string>(
+    SETTINGS_GROUPS.some((g) => g.id === initialGroup) ? initialGroup! : initial.llm_provider?.source === 'app' ? 'selftest' : 'ai',
+  );
   const [provider, setProvider] = useState(initial.llm_provider.value || 'opencode');
   const [model, setModel] = useState(initial.llm_model.value || '');
   const [baseUrl, setBaseUrl] = useState(initial.llm_base_url.value || '');
@@ -260,11 +268,18 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
     }
   }
 
+  const pick = (id: string) => {
+    setGroup(id);
+    window.history.replaceState(null, '', `/settings?g=${id}`);
+    window.scrollTo({ top: 0 });
+  };
+
   return (
+    <OpenGroup.Provider value={group}>
     <div className="grid gap-6 lg:grid-cols-[180px_minmax(0,1fr)]">
       <nav aria-label="Settings sections" className="scroll-x sticky top-14 z-10 -mt-2 flex gap-1.5 bg-background/95 py-2 backdrop-blur lg:top-6 lg:mx-0 lg:flex-col lg:self-start lg:px-0 lg:py-0">
         {SETTINGS_GROUPS.map((g) => (
-          <a key={g.id} href={`#g-${g.id}`} className="chip shrink-0 lg:h-9 lg:justify-start lg:rounded-md lg:border-0 lg:bg-transparent lg:px-3 lg:text-sm lg:hover:bg-accent">{g.label}</a>
+          <button key={g.id} type="button" onClick={() => pick(g.id)} aria-pressed={g.id === group} data-on={g.id === group} className="chip shrink-0 lg:h-9 lg:justify-start lg:rounded-md lg:border-0 lg:bg-transparent lg:px-3 lg:text-sm lg:hover:bg-accent lg:data-[on=true]:bg-accent lg:data-[on=true]:font-semibold">{g.label}</button>
         ))}
       </nav>
       <div className="flex min-w-0 flex-col gap-8">
@@ -459,5 +474,6 @@ export function SettingsForm({ initial, providers, companies: initialCompanies, 
         </Group>
       </div>
     </div>
+    </OpenGroup.Provider>
   );
 }

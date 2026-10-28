@@ -252,9 +252,13 @@ await page.getByRole('link', { name: 'Profile' }).first().click();
 await page.waitForURL(`${BASE}/profile`);
 assert.equal(await page.inputValue('#years'), '6.5');
 await shot('d11-profile');
-await page.goto(`${BASE}/settings`);
+await page.goto(`${BASE}/settings?g=ai`);
 assert.equal(await page.inputValue('#provider'), 'custom');
+const settingsNav = page.getByRole('navigation', { name: 'Settings sections' });
+await settingsNav.getByRole('button', { name: 'Job search' }).click();
 await page.locator('#search').waitFor();
+assert.equal(await page.locator('#provider').count(), 0, 'Settings shows one group at a time');
+await settingsNav.getByRole('button', { name: 'Check' }).click();
 await shot('d12-settings');
 await page.getByRole('button', { name: 'Run self-test' }).click();
 await page.getByTestId('selftest-results').waitFor({ timeout: 60_000 });
@@ -262,6 +266,7 @@ assert.equal(await page.locator('[data-check="db"]').getAttribute('data-ok'), 't
 await shot('d13-selftest');
 ok('profile: 6.5 years saves and shows after leaving the page; settings self-test runs');
 
+await settingsNav.getByRole('button', { name: 'Appearance' }).click();
 await page.getByRole('radio', { name: 'Dark' }).click();
 assert.equal(await page.evaluate(() => document.documentElement.classList.contains('dark')), true);
 for (const [path, name] of [['/', 'd20-home-dark'], ['/pipeline', 'd21-pipeline-dark'], [`/browser/${jobId}`, 'd22-browser-dark'], ['/discover', 'd23-discover-dark'], ['/mailroom', 'd24-mailroom-dark']]) {
@@ -278,19 +283,19 @@ await page.context().close();
 // ---------------- iPhone ----------------
 const phone = await open({ ...devices['iPhone 14'] });
 const pshot = (name) => phone.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
-for (const [path, name] of [['/', 'p00-home'], ['/discover', 'p01-discover'], ['/pipeline', 'p02-pipeline'], ['/browser', 'p03-browser'], [`/browser/${jobId}`, 'p04-browser-job'], ['/mailroom', 'p05-mailroom'], ['/jobs?view=all', 'p06-jobs'], ['/profile', 'p07-profile'], ['/settings', 'p08-settings'], ['__job__', 'p09-evaluation'], ['/insights', 'p10-insights'], ['/apply', 'p11-apply'], ['/more', 'p12-more']]) {
+for (const [path, name] of [['/', 'p00-home'], ['/discover', 'p01-discover'], ['/pipeline', 'p02-pipeline'], ['/browser', 'p03-browser'], [`/browser/${jobId}`, 'p04-browser-job'], ['/mailroom', 'p05-mailroom'], ['/jobs?view=all', 'p06-jobs'], ['/profile', 'p07-profile'], ['/settings', 'p08-settings'], ['__job__', 'p09-evaluation'], ['/insights', 'p10-insights'], ['/apply', 'p11-apply'], ['/more', 'p12-more'], ['/resume', 'p13-resume']]) {
   await phone.goto(path === '__job__' ? jobUrl : BASE + path);
   await phone.waitForLoadState('networkidle');
   await noSideScroll(phone, `phone ${path}`);
   await pshot(name);
 }
 const tabs = phone.getByRole('navigation', { name: 'Tabs' });
-for (const label of ['Home', 'Jobs', 'Apply', 'Pipeline', 'More']) await tabs.getByRole('link', { name: label, exact: true }).waitFor();
+for (const label of ['Home', 'Jobs', 'Apply', 'Track', 'Me']) await tabs.getByRole('link', { name: label, exact: true }).waitFor();
 ok('iPhone: bottom tabs, every screen fits without sideways scroll');
 
 // A small Android-size phone: the same screens must still fit, tab bar included.
 const small = await open({ viewport: { width: 360, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
-for (const path of ['/', '/discover', '/pipeline', '/browser', '/mailroom', '/jobs?view=all', '/profile', '/settings', '/insights', '/apply', '/more']) {
+for (const path of ['/', '/discover', '/pipeline', '/browser', '/mailroom', '/jobs?view=all', '/profile', '/settings', '/insights', '/apply', '/more', '/resume']) {
   await small.goto(BASE + path);
   await small.waitForLoadState('networkidle');
   await noSideScroll(small, `360px ${path}`);

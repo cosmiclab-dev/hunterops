@@ -244,7 +244,7 @@ function WebSetup() {
       <p className="text-sm leading-6 text-muted-foreground">
         X-Ray searches of Greenhouse, Lever, Ashby, SmartRecruiters and Workday run through a search API and show here, inside HunterOps. Create a free key at serper.dev (2,500 searches free, no card), then paste it in Settings under Web search. Until then, the In HunterOps tab shows everything the board scanner found.
       </p>
-      <Button asChild size="sm" className="self-start"><Link href="/settings#search"><Settings2 /> Add a search key</Link></Button>
+      <Button asChild size="sm" className="self-start"><Link href="/settings?g=search"><Settings2 /> Add a search key</Link></Button>
     </div>
   );
 }

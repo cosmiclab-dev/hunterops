@@ -269,7 +269,7 @@ export function EmailPanel({ jobId, initial, jobs }: { jobId?: string; initial: 
             <Label htmlFor="fw">Structure</Label>
             <Select id="fw" value={form.framework} onChange={set('framework')} options={FRAMEWORKS} />
           </div>
-          <p className="meta sm:col-span-2">Tone, length and signature come from <a href="/settings#writing" className="text-info">Settings, Writing</a>.</p>
+          <p className="meta sm:col-span-2">Tone, length and signature come from <a href="/settings?g=writing" className="text-info">Settings, Writing</a>.</p>
         </Group>
         <Button type="submit" disabled={busy}>{busy ? 'Writing…' : 'Write draft'}</Button>
         {err && <p className="text-sm text-destructive" role="alert">{err}</p>}

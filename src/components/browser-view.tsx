@@ -18,7 +18,7 @@ type Page = {
 };
 type Answer = { key: string; label: string; type: string; required: boolean; value: string; source: 'profile' | 'ai' | 'you'; note?: string };
 type Sheet = { answers: Answer[]; generic: boolean; model: string | null };
-type Opened = { page: Page; via?: { board: string; listing: string } | null; board?: string | null; grill: GrillResult | null; job: { id: string; status: string; grillScore: number | null } | null; autofill: Sheet | null; coverLetter?: string | null };
+type Opened = { page: Page; via?: { board: string; listing: string } | null; saved?: { reason: string } | null; board?: string | null; grill: GrillResult | null; job: { id: string; status: string; grillScore: number | null } | null; autofill: Sheet | null; coverLetter?: string | null };
 
 type View = 'reader' | 'live' | 'apply';
 type Tool = 'analyze' | 'autofill' | 'resume' | 'email';
@@ -200,6 +200,12 @@ export function BrowserView({ jobId: initialJobId, url, initialView }: { jobId?:
         <p className="border-b bg-success/10 px-4 py-2 text-xs leading-5 text-foreground" data-testid="employer-banner">
           Opened <b>{p.company || host}</b>’s own posting. {data.via.board} hides the application form from apps, so HunterOps found the same job on the employer’s site.{' '}
           <a href={data.via.listing} target="_blank" rel="noopener noreferrer" className="font-medium text-primary">See the {data.via.board} listing</a>
+        </p>
+      )}
+      {data.saved && (
+        <p className="border-b bg-warning/15 px-4 py-2 text-xs leading-5 text-foreground" data-testid="saved-banner">
+          {data.saved.reason} Showing the posting as the scan saved it{data.board ? `; HunterOps did not find it on ${p.company || 'the employer'}’s own site` : ''}.{' '}
+          <a href={p.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary">Open the site</a> to apply; your answers stay here to copy.
         </p>
       )}
       <div className={cn('grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)]', panel ? 'lg:grid-cols-[minmax(0,1fr)_400px]' : 'lg:grid-cols-1')}>

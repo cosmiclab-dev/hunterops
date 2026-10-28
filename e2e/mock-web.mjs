@@ -140,6 +140,10 @@ http.createServer((req, res) => {
       return send(res, 200, { results: url.searchParams.get('where') ? [{
         id: '777', title: 'Senior Talent Acquisition Partner', company: { display_name: 'Acme Cloud' }, location: { display_name: 'Bangalore, Karnataka' },
         redirect_url: 'https://www.adzuna.in/details/777?utm_medium=api', created: new Date().toISOString(), description: 'Senior Talent Acquisition Partner for our Bengaluru GCC. 6+ years of tech hiring…',
+      }, {
+        // Posted nowhere else: the Browser shows it as the scan saved it.
+        id: '888', title: 'Talent Acquisition Lead', company: { display_name: 'Quietfirm Talent' }, location: { display_name: 'Bangalore, Karnataka' },
+        redirect_url: 'https://www.adzuna.in/details/888?utm_medium=api', created: new Date().toISOString(), description: 'Talent Acquisition Lead for a Bengaluru product company. Own tech hiring end to end with Boolean sourcing and stakeholder management.',
       }] : [] });
     }
     // Greenhouse job API

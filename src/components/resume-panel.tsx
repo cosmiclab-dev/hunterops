@@ -11,7 +11,7 @@ import type { DesignIssue } from '@/lib/modules/designer';
 type Tailored = { resume: { id: string; name: string }; slop: SlopReport; issues: DesignIssue[]; pages: number; notes: string[]; model: string };
 type Saved = { id: string; name: string; createdAt: string; slopScore: number | null };
 
-export function ResumePanel({ jobId, saved }: { jobId: string; saved: Saved[] }) {
+export function ResumePanel({ jobId, saved, master = true }: { jobId: string; saved: Saved[]; master?: boolean }) {
   const [density, setDensity] = useState<'standard' | 'compact'>('standard');
   const [busy, setBusy] = useState('');
   const [err, setErr] = useState('');
@@ -43,8 +43,8 @@ export function ResumePanel({ jobId, saved }: { jobId: string; saved: Saved[] })
         <Button onClick={() => run('tailor', async () => setResult(await api<Tailored>('/api/resume/tailor', { method: 'POST', json: { jobId, density } })))} disabled={!!busy}>
           <Wand2 /> {busy === 'tailor' ? 'Tailoring… (up to a minute)' : 'Tailor to this job'}
         </Button>
-        <Button variant="outline" onClick={() => get('pdf')} disabled={!!busy}><Download /> Master PDF</Button>
-        <Button variant="outline" onClick={() => get('docx')} disabled={!!busy}><Download /> Master DOCX</Button>
+        {master && <Button variant="outline" onClick={() => get('pdf')} disabled={!!busy}><Download /> Master PDF</Button>}
+        {master && <Button variant="outline" onClick={() => get('docx')} disabled={!!busy}><Download /> Master DOCX</Button>}
       </div>
       {err && <p className="text-sm text-destructive" role="alert">{err}</p>}
 

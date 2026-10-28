@@ -2,7 +2,8 @@ import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { HttpError, ok, readJson, route } from '@/lib/http';
-import { checkFrameable, loadJobPage } from '@/lib/job-page';
+import { checkFrameable, loadJobPage, type JobPage } from '@/lib/job-page';
+import { textToHtml } from '@/lib/html';
 import { grillPage } from '@/lib/jobs';
 import { findOriginalPosting, isAggregatorUrl } from '@/lib/original-posting';
 import { loadSettings } from '@/lib/settings';
@@ -35,17 +36,25 @@ export const POST = route(async (req: Request) => {
   }
   const listing = job?.url;
   const employer = listing && url !== listing;
+  // The employer's page first when there is one, then the listing. A site
+  // that refuses apps (Adzuna answers 403) still opens: the posting as the
+  // scan saved it, with the site one tap away.
+  let saved: string | null = null;
   let page = await loadJobPage(url, employer ? null : job?.companyRef).catch((err) => {
-    if (!employer) throw err;
+    if (!employer && !job) throw err;
+    if (!employer) saved = (err as Error).message;
     return null;
   });
-  // The employer's page would not open: fall back to the listing.
-  if (!page) {
+  if (!page && employer) {
     url = listing!;
-    page = await loadJobPage(url, job?.companyRef);
+    page = await loadJobPage(url, job?.companyRef).catch((err) => {
+      saved = (err as Error).message;
+      return null;
+    });
   }
+  if (!page) page = storedPage(job!);
   const [frameable, grill] = await Promise.all([
-    page.frameable ?? checkFrameable(page.url),
+    saved ? false : page.frameable ?? checkFrameable(page.url),
     grillPage(page),
   ]);
   const existing = job ?? await prisma.job.findUnique({ where: { url: page.url }, include: { artifact: true } });
@@ -62,6 +71,8 @@ export const POST = route(async (req: Request) => {
   }
   return ok({
     page: { ...page, frameable },
+    // Set when the site refused to be read and this is the posting as saved by the scan.
+    saved: saved ? { reason: saved } : null,
     // Set when the listing came from a job board and this is the employer's own posting.
     via: board && url !== job?.url ? { board, listing: job!.url } : null,
     board: board && url === job?.url ? board : null,
@@ -71,3 +82,15 @@ export const POST = route(async (req: Request) => {
     coverLetter: existing?.artifact?.coverLetterText ?? null,
   });
 });
+
+type StoredJob = { url: string; title: string; company: string; location: string | null; workMode: string; salary: string | null; description: string | null; postedAt: Date | null };
+
+function storedPage(job: StoredJob): JobPage {
+  const description = job.description || `${job.title} at ${job.company}.`;
+  return {
+    url: job.url, applyUrl: job.url, source: 'web', ats: null,
+    title: job.title, company: job.company, location: job.location, remote: job.workMode === 'REMOTE',
+    postedAt: job.postedAt?.toISOString() ?? null, salary: job.salary,
+    description, html: textToHtml(description), fields: [], embedUrl: null, frameable: false, via: 'direct',
+  };
+}
