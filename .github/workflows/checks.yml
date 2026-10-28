@@ -171,6 +171,7 @@ jobs:
           # The keyless service allows one reply every 30 s, so calls are
           # spaced out and Apply is given longer than on Vercel.
           LLM_MIN_GAP_MS: ${{ steps.model.outputs.auth == 'gh' && '0' || '32000' }}
+          LLM_BUSY_RETRIES: '10'
           REQUEST_BUDGET_MS: '1500000'
           APPLY_WAIT_MS: '1500000'
         run: bash e2e/e2e-live.sh

@@ -196,9 +196,9 @@ async function send(cfg: LlmConfig, messages: ChatMessage[], opts: ChatOptions, 
       return again({ ...opts, json: false, temperature: undefined });
     }
     // Busy or rate-limited: wait as long as the provider asks (up to 30 s) and
-    // try again, twice at most, while the time budget allows.
+    // try again, twice at most (LLM_BUSY_RETRIES), while the time budget allows.
     const tries = opts.busyRetries ?? 0;
-    if ((res.status === 429 || res.status === 503 || (res.status === 402 && /retry after/i.test(raw))) && tries < 2) {
+    if ((res.status === 429 || res.status === 503 || (res.status === 402 && /retry after/i.test(raw))) && tries < (Number(process.env.LLM_BUSY_RETRIES) || 2)) {
       const wait = retryAfterMs(res.headers.get('retry-after'), raw);
       if (timeLeft() - wait > 30_000) {
         console.warn('[llm] busy', res.status, `retrying in ${Math.round(wait / 1000)}s`);
