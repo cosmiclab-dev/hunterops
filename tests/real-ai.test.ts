@@ -3,7 +3,7 @@
 // an employer's form taken from another company.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chatJson, closeTruncatedJson, type LlmConfig } from '@/lib/llm/client';
-import { normalizeEvaluation, runEvaluation } from '@/lib/career-ops/evaluate';
+import { evaluationMessages, normalizeEvaluation, runEvaluation } from '@/lib/career-ops/evaluate';
 import { sameCompany } from '@/lib/original-posting';
 import { inferNoticePeriod, profileFillSummary, normalizeProfile } from '@/lib/profile';
 
@@ -178,4 +178,21 @@ describe('a busy provider', () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => busy()));
     await expect(send(cfg, [{ role: 'user', content: 'x' }])).rejects.toThrow();
   }, 15_000);
+});
+
+describe('Career-Ops evaluation prompt', () => {
+  it('asks for the score and verdict before the long sections, so a cut answer keeps them', () => {
+    const args = { profileText: 'Senior recruiter.', targets: ['Senior Recruiter'], job: { title: 'TA', company: 'X', location: null, salary: null, url: 'https://x.test', description: 'Hire.' }, grill: null, signals: [], research: [], storyTitles: [] };
+    const system = evaluationMessages(args)[0].content;
+    const template = system.slice(system.indexOf('{"score"'));
+    expect(template.indexOf('"verdict"')).toBeLessThan(template.indexOf('"match"'));
+    expect(template.indexOf('"dimensions"')).toBeLessThan(template.indexOf('"interview"'));
+  });
+
+  it('keeps the score from an answer cut off in the middle of the long sections', () => {
+    const cut = '{"score":4.2,"dimensions":{"cv":4,"northStar":5,"comp":3,"culture":4,"redFlags":4},"verdict":{"apply":true,"headline":"Worth applying","why":"Sourcing match"},"match":{"rows":[{"requirement":"Boolean sourc';
+    const e = normalizeEvaluation(closeTruncatedJson(cut));
+    expect(e.score).toBe(4.2);
+    expect(e.verdict.headline).toBe('Worth applying');
+  });
 });

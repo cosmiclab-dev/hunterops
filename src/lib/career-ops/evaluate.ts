@@ -78,8 +78,12 @@ Verdict: apply true/false, a one-line headline, and why in 2-3 sentences. Risks:
 H. Draft answers for 3-5 likely application questions (why this company, why this role, notice period, expected CTC using the profile figure, or "open to discussing a fair range for the role" when the profile has none, one role-specific question). First person, plain, no buzzwords.
 Keywords: 10-20 exact JD terms for ATS mirroring.
 
-Reply with ONE JSON object, no markdown:
-{"archetype":{"name":"","targeted":true,"why":""},
+Reply with ONE JSON object, no markdown. Write the keys in this order: the score, dimensions, evidence and verdict come FIRST, so a long answer that gets cut still carries the decision:
+{"score":0,"dimensions":{"cv":0,"northStar":0,"comp":0,"culture":0,"redFlags":0},
+"evidence":{"cv":"supported","northStar":"supported","comp":"unknown","culture":"partial","redFlags":"partial"},
+"confidence":"medium","confidenceGaps":[""],
+"verdict":{"apply":true,"headline":"","why":""},
+"archetype":{"name":"","targeted":true,"why":""},
 "summary":{"domain":"","function":"","seniority":"","workMode":"","teamSize":"","culture":{"verdict":"pass","evidence":""},"tldr":""},
 "flags":[{"kind":"","quote":""}],
 "match":{"rows":[{"requirement":"","importance":"critical","tier":"stated","match":"strong","jdSignal":"","evidence":""}],"dropped":0,"gaps":[{"requirement":"","blocker":false,"risk":"","mitigation":""}]},
@@ -88,10 +92,6 @@ Reply with ONE JSON object, no markdown:
 "plan":{"cv":[{"section":"","change":"","why":""}],"linkedin":[{"section":"","change":"","why":""}]},
 "interview":{"stories":[{"requirement":"","theme":"","title":"","situation":"","task":"","action":"","result":"","reflection":"","bestFor":""}],"caseStudy":"","hardQuestions":[{"question":"","answer":""}]},
 "legitimacy":{"tier":"high","observations":[""]},
-"dimensions":{"cv":0,"northStar":0,"comp":0,"culture":0,"redFlags":0},
-"evidence":{"cv":"supported","northStar":"supported","comp":"unknown","culture":"partial","redFlags":"partial"},
-"score":0,"confidence":"medium","confidenceGaps":[""],
-"verdict":{"apply":true,"headline":"","why":""},
 "risks":[""],
 "answers":[{"question":"","answer":""}],
 "keywords":[""]}`;
@@ -211,7 +211,7 @@ function scoreMessages(args: Parameters<typeof evaluationMessages>[0], partial?:
 export async function runEvaluation(cfg: LlmConfig, args: Parameters<typeof evaluationMessages>[0]) {
   // The short score request runs alongside the full A-H answer: a slow model
   // can run out of time on the long one, and the score must still come back.
-  const quick = chatJson(cfg, scoreMessages(args), { maxTokens: 2500, timeoutMs: 150_000, temperature: 0.2 }).catch(() => null);
+  const quick = chatJson(cfg, scoreMessages(args), { maxTokens: 6000, timeoutMs: 150_000, temperature: 0.2 }).catch(() => null);
   let fullErr: unknown = null;
   const out = await chatJson(cfg, evaluationMessages(args), { maxTokens: 12_000, timeoutMs: 270_000, temperature: 0.2 }).catch((err) => {
     fullErr = err;
